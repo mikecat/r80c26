@@ -173,6 +173,7 @@ window.addEventListener("DOMContentLoaded", () => {
 	};
 
 	const tick = (currentTime) => {
+		if (clockBudget > 0) clockBudget = 0;
 		if (running) {
 			if (budgetPreviousTime !== null) {
 				clockBudget += Math.max(0, targetSpeed * (currentTime - budgetPreviousTime) * 1000);
