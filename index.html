@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="description" content="A Z80 emulator that works on web browsers.">
+	<title>R80C26</title>
+	<script src="r80c26.js"></script>
+	<script src="r80c26_ui.js"></script>
+	<link rel="stylesheet" href="index.css">
+</head>
+<body>
+	<div id="runControlWrapper">
+		<input type="text" value="6" size="5" id="speedInput"> MHz
+		<button type="button" id="runButton">
+			<img src="lib/tabler-icons/player-play.svg" alt="">
+			Run
+		</button>
+		<button type="button" id="pauseButton">
+			<img src="lib/tabler-icons/player-pause.svg" alt="">
+			Pause
+		</button>
+		<button type="button" id="stepButton">
+			<img src="lib/tabler-icons/player-skip-forward.svg" alt="">
+			Step
+		</button>
+		<button type="button" id="resetButton">
+			<img src="lib/tabler-icons/restore.svg" alt="">
+			Reset
+		</button>
+	</div>
+	<div id="registerInfoWrapper">
+		<div id="registerInfoGrid">
+			<div class="r1" id="speedAndTimeArea">
+				<div class="r1 c1" id="elapsedStepsWrapper">
+					<span id="elapsedStepsDisplay">000,000,000</span> steps
+				</div>
+				<div class="r1 c2" id="elapsedClocksWrapper">
+					<span id="elapsedClocksDisplay">000,000,000</span> clocks
+				</div>
+				<div class="r1 c3" id="currentSpeedWrapper">
+					<span id="currentSpeedDisplay">0.000</span> MHz
+				</div>
+			</div>
+			<div class="r2" id="displayFormatArea">
+				<div class="r1 c1" id="displayFormatSelector">
+					<label for="displayFormatSignedDecimal">
+						<input type="radio" name="displayFormat" id="displayFormatSignedDecimal">
+						signed
+					</label>
+					<label for="displayFormatUnsignedDecimal">
+						<input type="radio" name="displayFormat" id="displayFormatUnsignedDecimal">
+						unsigned
+					</label>
+					<label for="displayFormatHexaecimal">
+						<input type="radio" name="displayFormat" id="displayFormatHexaecimal" checked>
+						hex.
+					</label>
+				</div>
+				<div class="r1 c2">
+					<label for="alwaysDisplaySpPcInHex">
+						<input type="checkbox" id="alwaysDisplaySpPcInHex" checked>
+						SP &amp; PC always in hex.
+					</label>
+				</div>
+			</div>
+			<div class="r3 c1">A: <input type="text" value="0x00" size="5" id="registerInputA"></div>
+			<div class="r3 c2">F: <input type="text" value="0x00" size="5" id="registerInputF"></div>
+			<div class="r3 c3">A': <input type="text" value="0x00" size="5" id="registerInputAp"></div>
+			<div class="r3 c4">F': <input type="text" value="0x00" size="5" id="registerInputFp"></div>
+			<div class="r3 c5">IX: <input type="text" value="0x0000" size="7" id="registerInputIX"></div>
+			<div class="r3 c6">BC: <input type="text" value="0x0000" size="7" id="registerInputBC"></div>
+			<div class="r4 c1">B: <input type="text" value="0x00" size="5" id="registerInputB"></div>
+			<div class="r4 c2">C: <input type="text" value="0x00" size="5" id="registerInputC"></div>
+			<div class="r4 c3">B': <input type="text" value="0x00" size="5" id="registerInputBp"></div>
+			<div class="r4 c4">C': <input type="text" value="0x00" size="5" id="registerInputCp"></div>
+			<div class="r4 c5">IY: <input type="text" value="0x0000" size="7" id="registerInputIY"></div>
+			<div class="r4 c6">DE: <input type="text" value="0x0000" size="7" id="registerInputDE"></div>
+			<div class="r5 c1">D: <input type="text" value="0x00" size="5" id="registerInputD"></div>
+			<div class="r5 c2">E: <input type="text" value="0x00" size="5" id="registerInputE"></div>
+			<div class="r5 c3">D': <input type="text" value="0x00" size="5" id="registerInputDp"></div>
+			<div class="r5 c4">E': <input type="text" value="0x00" size="5" id="registerInputEp"></div>
+			<div class="r5 c5">SP: <input type="text" value="0x0000" size="7" id="registerInputSP"></div>
+			<div class="r5 c7">HL: <input type="text" value="0x0000" size="7" id="registerInputHL"></div>
+			<div class="r6 c1">H: <input type="text" value="0x00" size="5" id="registerInputH"></div>
+			<div class="r6 c2">L: <input type="text" value="0x00" size="5" id="registerInputL"></div>
+			<div class="r6 c3">H': <input type="text" value="0x00" size="5" id="registerInputHp"></div>
+			<div class="r6 c4">L': <input type="text" value="0x00" size="5" id="registerInputLp"></div>
+			<div class="r6 c5">PC: <input type="text" value="0x0000" size="7" id="registerInputPC"></div>
+			<div class="r7 c1">I: <input type="text" value="0x00" size="5" id="registerInputI"></div>
+			<div class="r7 c2">R: <input type="text" value="0x00" size="5" id="registerInputR"></div>
+			<div class="r7 c3 large">
+				<label for="registerInputIFF1">
+					IFF1: <input type="checkbox" id="registerInputIFF1">
+				</label>
+			</div>
+			<div class="r7 c4 large">
+				<label for="registerInputIFF2">
+					IFF2: <input type="checkbox" id="registerInputIFF2">
+				</label>
+			</div>
+			<div class="r7 large" id="registerInputIMFWrapper">
+				IMF:
+				<label for="registerInputIMF_0">
+					0<input type="radio" id="registerInputIMF_0" name="registerInputIMF" checked>
+				</label>
+				<label for="registerInputIMF_1">
+					1<input type="radio" id="registerInputIMF_1" name="registerInputIMF">
+				</label>
+				<label for="registerInputIMF_2">
+					2<input type="radio" id="registerInputIMF_2" name="registerInputIMF">
+				</label>
+			</div>
+			<div class="r8 c1" id="haltIndicatorWrapper">
+				<span id="haltIndicator">HALT</span>
+			</div>
+			<div class="r8" id="flagBitsWrapper">
+				Flags:
+				<label for="flagInputS" title="Sign">
+					S<input type="checkbox" id="flagInputS">
+				</label>
+				<label for="flagInputZ" title="Zero">
+					Z<input type="checkbox" id="flagInputZ">
+				</label>
+				<label for="flagInputH" title="Half Carry">
+					H<input type="checkbox" id="flagInputH">
+				</label>
+				<label for="flagInputPV" title="Pality/Overflow">
+					P/V<input type="checkbox" id="flagInputPV">
+				</label>
+				<label for="flagInputN" title="Add/Subtract">
+					N<input type="checkbox" id="flagInputN">
+				</label>
+				<label for="flagInputC" title="Carry">
+					C<input type="checkbox" id="flagInputC">
+				</label>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
