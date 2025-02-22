@@ -158,6 +158,20 @@ summary {
 	white-space: pre;
 }
 
+.memoryContents .byte.editable {
+	position: relative;
+	cursor: text;
+}
+
+.memoryContents .byte.editable input {
+	position: absolute;
+	z-index: 1;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	font-family: monospace;
+}
+
 .memoryContents .chars {
 	grid-column: 23;
 	padding-left: 0.25em;

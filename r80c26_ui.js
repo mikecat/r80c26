@@ -10,8 +10,17 @@ window.addEventListener("DOMContentLoaded", () => {
 	let ROM = new Uint8Array(0);
 	let RAM = new Uint8Array(0);
 	let RAMdirty = new Uint8Array(0);
-	const ROMViewerCache = { address: new Map(), byte: new Map(), chars: new Map() };
-	const RAMViewerCache = { address: new Map(), byte: new Map(), chars: new Map() };
+	const ROMViewerCache = {
+		address: new Map(),
+		byte: new Map(),
+		chars: new Map()
+	};
+	const RAMViewerCache = {
+		address: new Map(),
+		byte: new Map(),
+		chars: new Map(),
+		getEditTarget: () => ({ data: RAM, dirty: RAMdirty }),
+	};
 
 	const readMemory = (address) => {
 		if (ROM_START <= address && address < ROM_START + ROM.length) {
@@ -78,10 +87,42 @@ window.addEventListener("DOMContentLoaded", () => {
 						byteElement.style.gridColumn = 3 + j + Math.floor(j / 4);
 						cache.byte.set(address, byteElement);
 						element.appendChild(byteElement);
+						if (cache.getEditTarget) {
+							byteElement.classList.add("editable");
+							byteElement.addEventListener("click", () => {
+								if (!byteElement.getAttribute("data-editing")) {
+									byteElement.setAttribute("data-editing", "1");
+									const input = document.createElement("input");
+									input.setAttribute("type", "text");
+									input.setAttribute("size", "2");
+									input.setAttribute("maxlength", "2");
+									input.value = byteElement.textContent;
+									byteElement.appendChild(input);
+									const enterInput = () => {
+										const value = parseInt(input.value, 16);
+										const { data, dirty } = cache.getEditTarget();
+										if (address < data.length) {
+											data[address] = value;
+											dirty[address] = 1;
+										}
+										byteElement.removeAttribute("data-editing");
+										byteElement.removeChild(input);
+									};
+									input.addEventListener("keydown", (event) => {
+										if (event.key === "Enter" && !event.isComposing) enterInput();
+									});
+									input.addEventListener("blur", enterInput);
+									input.focus();
+									input.select();
+								}
+							});
+						}
 					}
-					const byteString = address < data.length ? "0" + data[address].toString(16) : "  ";
-					byteElement.textContent = byteString.substring(byteString.length - 2);
-					if (dirty && address < dirty.length) dirty[address] = 0;
+					if (!byteElement.getAttribute("data-editing")) {
+						const byteString = address < data.length ? "0" + data[address].toString(16) : "  ";
+						byteElement.textContent = byteString.substring(byteString.length - 2);
+						if (dirty && address < dirty.length) dirty[address] = 0;
+					}
 				}
 				lineChars +=
 					address >= data.length ? " " :
