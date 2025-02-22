@@ -28,7 +28,8 @@
 			Reset
 		</button>
 	</div>
-	<div id="registerInfoWrapper">
+	<details id="registerInfoWrapper">
+		<summary>CPU status</summary>
 		<div id="registerInfoGrid">
 			<div class="r1" id="speedAndTimeArea">
 				<div class="r1 c1" id="elapsedStepsWrapper">
@@ -135,6 +136,25 @@
 				</label>
 			</div>
 		</div>
-	</div>
+	</details>
+	<details id="programInputWrapper" open>
+		<summary>program (ROM) input (array or Intel HEX)</summary>
+		<textarea id="programInput" rows="10" cols="80"></textarea>
+	</details>
+	<details id="memoryView">
+		<summary>memory view &amp; RAM size setting</summary>
+		<div id="romViewerWrapper" class="memoryViewerWrapper">
+			ROM size: <span id="romSizeArea">0</span> KiB
+			<div id="romViewer" class="memoryViewer">
+				<div id="romContents" class="memoryContents"></div>
+			</div>
+		</div>
+		<div id="ramViewerWrapper" class="memoryViewerWrapper">
+			RAM size: <input type="number" min="0" max="24" value="4" size="5" id="ramSizeInput"> KiB
+			<div id="ramViewer" class="memoryViewer">
+				<div id="ramContents" class="memoryContents"></div>
+			</div>
+		</div>
+	</details>
 </body>
 </html>

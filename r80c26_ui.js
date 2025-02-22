@@ -4,7 +4,32 @@ window.addEventListener("DOMContentLoaded", () => {
 	const elems = {};
 	document.querySelectorAll("[id]").forEach((e) => elems[e.id] = e);
 
-	const CPU = new R80C26();
+	const ROM_START = 0x0000;
+	const RAM_START = 0x8000;
+
+	let ROM = new Uint8Array(0);
+	let RAM = new Uint8Array(0);
+	let RAMdirty = new Uint8Array(0);
+	const ROMViewerCache = { address: new Map(), byte: new Map(), chars: new Map() };
+	const RAMViewerCache = { address: new Map(), byte: new Map(), chars: new Map() };
+
+	const readMemory = (address) => {
+		if (ROM_START <= address && address < ROM_START + ROM.length) {
+			return ROM[address - ROM_START];
+		} else if (RAM_START <= address && address < RAM_START + RAM.length) {
+			return RAM[address - RAM_START];
+		}
+		return 0xff;
+	};
+
+	const writeMemory = (address, data) => {
+		if (RAM_START <= address && address < RAM_START + RAM.length) {
+			RAM[address - RAM_START] = data;
+			RAMdirty[address - RAM_START] = 1;
+		}
+	};
+
+	const CPU = new R80C26(readMemory, writeMemory);
 	let running = false;
 	let elapsedSteps = 0, elapsedClocks = 0, renderedElepsedSteps = null, renderedElapsedClocks = null;
 	let budgetPreviousTime = null, clockBudget = 0;
@@ -35,6 +60,80 @@ window.addEventListener("DOMContentLoaded", () => {
 		}
 	};
 	setRunning(false);
+
+	// dirty が指定されていないとき、サイズの変更も含めたフル同期を行う
+	// dirty が指定されているとき、サイズの変更は無いと仮定し、変化した部分のみ更新する
+	const renderMemoryContents = (element, cache, data, addressOffset, dirty = null) => {
+		for (let i = 0; i < data.length; i += 16) {
+			let lineDirty = !dirty;
+			let lineChars = "";
+			for (let j = 0; j < 16 && (i + j < data.length || i === 0); j++) {
+				const address = i + j;
+				if (!dirty || dirty[address]) {
+					let byteElement = cache.byte.get(address);
+					if (!byteElement) {
+						byteElement = document.createElement("div");
+						byteElement.classList.add("byte");
+						byteElement.style.gridRow = Math.floor(i / 16) + 1;
+						byteElement.style.gridColumn = 3 + j + Math.floor(j / 4);
+						cache.byte.set(address, byteElement);
+						element.appendChild(byteElement);
+					}
+					const byteString = address < data.length ? "0" + data[address].toString(16) : "  ";
+					byteElement.textContent = byteString.substring(byteString.length - 2);
+					if (dirty && address < dirty.length) dirty[address] = 0;
+				}
+				lineChars +=
+					address >= data.length ? " " :
+					0x20 <= data[address] && data[address] < 0x7f ? String.fromCharCode(data[address]) :
+					".";
+			}
+			if (lineDirty) {
+				let charsElement = cache.chars.get(i);
+				if (!charsElement) {
+					charsElement = document.createElement("div");
+					charsElement.classList.add("chars");
+					charsElement.style.gridRow = Math.floor(i / 16) + 1;
+					cache.chars.set(i, charsElement);
+					element.appendChild(charsElement);
+				}
+				charsElement.textContent = lineChars;
+			}
+		}
+		if (!dirty) {
+			for (let i = 0; i < data.length; i += 16) {
+				let addressElement = cache.address.get(i);
+				if (!addressElement) {
+					addressElement = document.createElement("div");
+					addressElement.classList.add("address");
+					addressElement.style.gridRow = Math.floor(i / 16) + 1;
+					cache.address.set(i, addressElement);
+					element.appendChild(addressElement);
+				}
+				const addressString = "000" + (addressOffset + i).toString(16);
+				addressElement.textContent = addressString.substring(addressString.length - 4);
+			}
+			for (let i = Math.floor((data.length + 15) / 16) * 16; ; i += 16) {
+				const addressToRemove = cache.address.get(i);
+				const charsToRemove = cache.chars.get(i);
+				if (!addressToRemove && !charsToRemove) break;
+				if (addressToRemove) {
+					element.removeChild(addressToRemove);
+					cache.address.delete(i);
+				}
+				if (charsToRemove) {
+					element.removeChild(charsToRemove);
+					cache.chars.delete(i);
+				}
+			}
+			for (let i = data.length === 0 ? 0 : Math.max(data.length, 16); ; i++) {
+				const byteToRemove = cache.byte.get(i);
+				if (!byteToRemove) break;
+				element.removeChild(byteToRemove);
+				cache.byte.delete(i);
+			}
+		}
+	};
 
 	const setContents = (element, contents) => {
 		while (element.firstChild) element.removeChild(element.firstChild);
@@ -196,6 +295,7 @@ window.addEventListener("DOMContentLoaded", () => {
 			setContents(elems.elapsedClocksDisplay, renderNumber(elapsedClocks));
 			renderedElapsedClocks = elapsedClocks;
 		}
+		renderMemoryContents(elems.ramContents, RAMViewerCache, RAM, 0x8000, RAMdirty);
 		if (currentTime - speedPreviousTime >= 1000) {
 			const currentSpeed = (elapsedClocks - speedPreviousClocks) / (currentTime - speedPreviousTime) / 1000;
 			elems.currentSpeedDisplay.textContent = Math.max(currentSpeed, 0).toFixed(3);
@@ -215,7 +315,105 @@ window.addEventListener("DOMContentLoaded", () => {
 	elems.resetButton.addEventListener("click", () => {
 		setRunning(false);
 		CPU.reset();
+		for (let i = 0; i < RAM.length; i++) {
+			RAM[i] = 0xff;
+			RAMdirty[i] = 1;
+		}
 		elapsedSteps = 0;
 		elapsedClocks = 0;
 	});
+
+	const updateROM = () => {
+		const programData = elems.programInput.value;
+		const newRom = new Uint8Array(0x8000);
+		for (let i = 0; i < newRom.length; i++) newRom[i] = 0xff;
+		let newRomSize = 0;
+		// Intel HEX と仮定してパースする
+		const lines = programData.split(/[\r\n]/);
+		let validHexLineFound = false;
+		let hexOffset = 0;
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			if (/^:([0-9a-f]{2})+$/i.test(line)) {
+				const lineData = [];
+				for (let j = 1; j < line.length; j += 2) {
+					lineData.push(parseInt(line.substring(j, j + 2), 16));
+				}
+				if (lineData[0] !== lineData.length - 5) continue;
+				let checksum = 0;
+				for (let j = 0; j < lineData.length; j++) checksum += lineData[j];
+				if (checksum % 0x100 !== 0) continue;
+				switch (lineData[3]) {
+					case 0: // データ
+						{
+							const startAddress = (lineData[1] << 8) | lineData[2];
+							for (let j = 0; j < lineData[0]; j++) {
+								const address = hexOffset + startAddress + j;
+								if (0 <= address && address < newRom.length) {
+									newRom[address] = lineData[4 + j];
+									if (newRomSize <= address) newRomSize = address + 1;
+								}
+							}
+						}
+						validHexLineFound = true;
+						break;
+					case 1: // End Of File
+						if (lineData[0] === 0) validHexLineFound = true;
+						break;
+					case 2: // 拡張セグメントアドレス
+						if (lineData[0] === 2) {
+							hexOffset = ((lineData[4] << 8) | lineData[5]) << 4;
+							validHexLineFound = true;
+						}
+						break;
+					case 3: // 開始セグメントアドレス
+						if (lineData[0] === 4) validHexLineFound = true;
+						break;
+					case 4: // 拡張リニアアドレス
+						if (lineData[0] === 2) {
+							hexOffset = ((lineData[4] << 8) | lineData[5]) * 0x10000;
+							validHexLineFound = true;
+						}
+						break;
+					case 5: // 開始リニアアドレス
+						if (lineData[0] === 4) validHexLineFound = true;
+						break;
+				}
+			}
+		}
+		// Intel HEX じゃなさそうなら、配列データとしてパースする
+		if (!validHexLineFound) {
+			const arrayElements = programData.split(",");
+			for (let i = 0; i < arrayElements.length && i < newRom.length; i++) {
+				const value = parseInt(arrayElements[i]);
+				if (!isNaN(value)) {
+					newRom[i] = value;
+					newRomSize = i + 1;
+				}
+			}
+		}
+		// 得られたデータを適用する
+		ROM = new Uint8Array(newRomSize);
+		for (let i = 0; i < newRomSize; i++) ROM[i] = newRom[i];
+		elems.romSizeArea.textContent = (newRomSize / 1024).toFixed(2);
+		renderMemoryContents(elems.romContents, ROMViewerCache, ROM, 0);
+	};
+	elems.programInput.addEventListener("change", updateROM);
+	updateROM();
+
+	const changeRamSize = () => {
+		const newRamSizeRaw = parseFloat(elems.ramSizeInput.value);
+		if (isNaN(newRamSizeRaw) || newRamSizeRaw < 0) return;
+		const newRamSize = Math.min(0x6000, Math.ceil(newRamSizeRaw * 1024));
+		const newRam = new Uint8Array(newRamSize);
+		for (let i = 0; i < RAM.length && i < newRam.length; i++) {
+			newRam[i] = RAM[i];
+		}
+		for (let i = RAM.length; i < newRam.length; i++) newRam[i] = 0xff;
+		RAM = newRam;
+		RAMdirty = new Uint8Array(RAM.length);
+		renderMemoryContents(elems.ramContents, RAMViewerCache, RAM, 0x8000);
+	};
+	elems.ramSizeInput.addEventListener("change", changeRamSize);
+	changeRamSize();
 });

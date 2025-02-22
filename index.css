@@ -3,9 +3,17 @@ body {
 	flex-direction: column;
 }
 
-body > div {
+body > * {
 	margin-left: auto;
 	margin-right: auto;
+}
+
+body > :not(:first-child) {
+	margin-top: 0.5em;
+}
+
+summary {
+	text-align: center;
 }
 
 #runControlWrapper button img {
@@ -106,4 +114,52 @@ body > div {
 
 .splittedNumber > span:not(:first-child)::before {
 	content: ",";
+}
+
+#programInput {
+	margin-top: 0.5em;
+}
+
+#ramSizeInput {
+	text-align: right;
+}
+
+.memoryViewerWrapper {
+	margin-top: 0.5em;
+}
+
+.memoryViewer {
+	border: 1px solid currentColor;
+	resize: vertical;
+	height: 10em;
+	overflow-y: scroll;
+}
+
+.memoryContents {
+	display: grid;
+	grid-template-columns: auto repeat(4, 0.3em auto auto auto auto) 0.3em auto;
+	font-family: monospace;
+	padding: 0.5em 1em;
+}
+
+.memoryContents > * {
+	padding-top: 0.25em;
+	padding-bottom: 0.25em;
+}
+
+.memoryContents .address {
+	grid-column: 1;
+	padding-right: 0.25em;
+}
+
+.memoryContents .byte {
+	padding-left: 0.25em;
+	padding-right: 0.25em;
+	white-space: pre;
+}
+
+.memoryContents .chars {
+	grid-column: 23;
+	padding-left: 0.25em;
+	white-space: pre;
 }
