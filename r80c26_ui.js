@@ -4,6 +4,8 @@ window.addEventListener("DOMContentLoaded", () => {
 	const elems = {};
 	document.querySelectorAll("[id]").forEach((e) => elems[e.id] = e);
 
+	const uart = new UART();
+
 	const ROM_START = 0x0000;
 	const RAM_START = 0x8000;
 
@@ -27,6 +29,17 @@ window.addEventListener("DOMContentLoaded", () => {
 			return ROM[address - ROM_START];
 		} else if (RAM_START <= address && address < RAM_START + RAM.length) {
 			return RAM[address - RAM_START];
+		} else if (address === 0xe000) {
+			// UART受信
+			return uart.readDataRegister() & 0xff;
+		} else if (address === 0xe001) {
+			// UART状態
+			const status = uart.getStatus();
+			return (
+				(status.rxBufferHasData ? 1 : 0) |
+				(status.txBufferHasSpace ? 2 : 0) |
+				(status.rxOverflow ? 4 : 0)
+			);
 		}
 		return 0xff;
 	};
@@ -35,10 +48,13 @@ window.addEventListener("DOMContentLoaded", () => {
 		if (RAM_START <= address && address < RAM_START + RAM.length) {
 			RAM[address - RAM_START] = data;
 			RAMdirty[address - RAM_START] = 1;
+		} else if (address === 0xe000) {
+			// UART送信
+			uart.writeDataRegister(data);
 		}
 	};
 
-	const CPU = new R80C26(readMemory, writeMemory);
+	const cpu = new R80C26(readMemory, writeMemory);
 	let running = false;
 	let elapsedSteps = 0, elapsedClocks = 0, renderedElepsedSteps = null, renderedElapsedClocks = null;
 	let budgetPreviousTime = null, clockBudget = 0;
@@ -203,13 +219,13 @@ window.addEventListener("DOMContentLoaded", () => {
 	const setRegister = (element, registerName) => {
 		const value = parseInt(element.value);
 		if (isNaN(value)) return;
-		CPU[registerName] = value;
+		cpu[registerName] = value;
 	};
 	const setFlag = (element, flagBit) => {
 		if (element.checked) {
-			CPU.F |= 1 << flagBit;
+			cpu.F |= 1 << flagBit;
 		} else {
-			CPU.F &= ~(1 << flagBit);
+			cpu.F &= ~(1 << flagBit);
 		}
 	};
 	elems.registerInputA.addEventListener("change", () => setRegister(elems.registerInputA, "A"));
@@ -237,11 +253,11 @@ window.addEventListener("DOMContentLoaded", () => {
 	elems.registerInputBC.addEventListener("change", () => setRegister(elems.registerInputBC, "BC"));
 	elems.registerInputDE.addEventListener("change", () => setRegister(elems.registerInputDE, "DE"));
 	elems.registerInputHL.addEventListener("change", () => setRegister(elems.registerInputHL, "HL"));
-	elems.registerInputIFF1.addEventListener("change", () => CPU.IFF1 = elems.registerInputIFF1.checked);
-	elems.registerInputIFF2.addEventListener("change", () => CPU.IFF2 = elems.registerInputIFF2.checked);
-	elems.registerInputIMF_0.addEventListener("change", () => CPU.IMF = 0);
-	elems.registerInputIMF_1.addEventListener("change", () => CPU.IMF = 1);
-	elems.registerInputIMF_2.addEventListener("change", () => CPU.IMF = 2);
+	elems.registerInputIFF1.addEventListener("change", () => cpu.IFF1 = elems.registerInputIFF1.checked);
+	elems.registerInputIFF2.addEventListener("change", () => cpu.IFF2 = elems.registerInputIFF2.checked);
+	elems.registerInputIMF_0.addEventListener("change", () => cpu.IMF = 0);
+	elems.registerInputIMF_1.addEventListener("change", () => cpu.IMF = 1);
+	elems.registerInputIMF_2.addEventListener("change", () => cpu.IMF = 2);
 	elems.flagInputS.addEventListener("change", () => setFlag(elems.flagInputS, 7));
 	elems.flagInputZ.addEventListener("change", () => setFlag(elems.flagInputZ, 6));
 	elems.flagInputH.addEventListener("change", () => setFlag(elems.flagInputH, 4));
@@ -253,7 +269,7 @@ window.addEventListener("DOMContentLoaded", () => {
 		if (document.activeElement !== element) element.value = value;
 	};
 
-	const renderStatus = () => {
+	const renderCpuStatus = () => {
 		const render8bit = elems.displayFormatSignedDecimal.checked ? (value) => {
 			return (value >= 0x80 ? value - 0x100 : value).toString();
 		} : elems.displayFormatUnsignedDecimal.checked ? (value) => {
@@ -274,88 +290,56 @@ window.addEventListener("DOMContentLoaded", () => {
 			const rendered = "000" + value.toString(16);
 			return "0x" + rendered.substring(rendered.length - 4);
 		} : render16bit;
-		setValueIfNotFocused(elems.registerInputA, render8bit(CPU.A));
-		setValueIfNotFocused(elems.registerInputF, render8bit(CPU.F));
-		setValueIfNotFocused(elems.registerInputB, render8bit(CPU.B));
-		setValueIfNotFocused(elems.registerInputC, render8bit(CPU.C));
-		setValueIfNotFocused(elems.registerInputD, render8bit(CPU.D));
-		setValueIfNotFocused(elems.registerInputE, render8bit(CPU.E));
-		setValueIfNotFocused(elems.registerInputH, render8bit(CPU.H));
-		setValueIfNotFocused(elems.registerInputL, render8bit(CPU.L));
-		setValueIfNotFocused(elems.registerInputAp, render8bit(CPU.Ap));
-		setValueIfNotFocused(elems.registerInputFp, render8bit(CPU.Fp));
-		setValueIfNotFocused(elems.registerInputBp, render8bit(CPU.Bp));
-		setValueIfNotFocused(elems.registerInputCp, render8bit(CPU.Cp));
-		setValueIfNotFocused(elems.registerInputDp, render8bit(CPU.Dp));
-		setValueIfNotFocused(elems.registerInputEp, render8bit(CPU.Ep));
-		setValueIfNotFocused(elems.registerInputHp, render8bit(CPU.Hp));
-		setValueIfNotFocused(elems.registerInputLp, render8bit(CPU.Lp));
-		setValueIfNotFocused(elems.registerInputI, render8bit(CPU.I));
-		setValueIfNotFocused(elems.registerInputR, render8bit(CPU.R));
-		setValueIfNotFocused(elems.registerInputIX, render16bit(CPU.IX));
-		setValueIfNotFocused(elems.registerInputIY, render16bit(CPU.IY));
-		setValueIfNotFocused(elems.registerInputBC, render16bit(CPU.BC));
-		setValueIfNotFocused(elems.registerInputDE, render16bit(CPU.DE));
-		setValueIfNotFocused(elems.registerInputHL, render16bit(CPU.HL));
-		setValueIfNotFocused(elems.registerInputSP, renderSpPc(CPU.SP));
-		setValueIfNotFocused(elems.registerInputPC, renderSpPc(CPU.PC));
-		elems.registerInputIFF1.checked = CPU.IFF1;
-		elems.registerInputIFF2.checked = CPU.IFF2;
-		elems.registerInputIMF_0.checked = CPU.IMF === 0;
-		elems.registerInputIMF_1.checked = CPU.IMF === 1;
-		elems.registerInputIMF_2.checked = CPU.IMF === 2;
-		elems.flagInputS.checked = CPU.F & 0x80;
-		elems.flagInputZ.checked = CPU.F & 0x40;
-		elems.flagInputH.checked = CPU.F & 0x10;
-		elems.flagInputPV.checked = CPU.F & 0x04;
-		elems.flagInputN.checked = CPU.F & 0x02;
-		elems.flagInputC.checked = CPU.F & 0x01;
+		setValueIfNotFocused(elems.registerInputA, render8bit(cpu.A));
+		setValueIfNotFocused(elems.registerInputF, render8bit(cpu.F));
+		setValueIfNotFocused(elems.registerInputB, render8bit(cpu.B));
+		setValueIfNotFocused(elems.registerInputC, render8bit(cpu.C));
+		setValueIfNotFocused(elems.registerInputD, render8bit(cpu.D));
+		setValueIfNotFocused(elems.registerInputE, render8bit(cpu.E));
+		setValueIfNotFocused(elems.registerInputH, render8bit(cpu.H));
+		setValueIfNotFocused(elems.registerInputL, render8bit(cpu.L));
+		setValueIfNotFocused(elems.registerInputAp, render8bit(cpu.Ap));
+		setValueIfNotFocused(elems.registerInputFp, render8bit(cpu.Fp));
+		setValueIfNotFocused(elems.registerInputBp, render8bit(cpu.Bp));
+		setValueIfNotFocused(elems.registerInputCp, render8bit(cpu.Cp));
+		setValueIfNotFocused(elems.registerInputDp, render8bit(cpu.Dp));
+		setValueIfNotFocused(elems.registerInputEp, render8bit(cpu.Ep));
+		setValueIfNotFocused(elems.registerInputHp, render8bit(cpu.Hp));
+		setValueIfNotFocused(elems.registerInputLp, render8bit(cpu.Lp));
+		setValueIfNotFocused(elems.registerInputI, render8bit(cpu.I));
+		setValueIfNotFocused(elems.registerInputR, render8bit(cpu.R));
+		setValueIfNotFocused(elems.registerInputIX, render16bit(cpu.IX));
+		setValueIfNotFocused(elems.registerInputIY, render16bit(cpu.IY));
+		setValueIfNotFocused(elems.registerInputBC, render16bit(cpu.BC));
+		setValueIfNotFocused(elems.registerInputDE, render16bit(cpu.DE));
+		setValueIfNotFocused(elems.registerInputHL, render16bit(cpu.HL));
+		setValueIfNotFocused(elems.registerInputSP, renderSpPc(cpu.SP));
+		setValueIfNotFocused(elems.registerInputPC, renderSpPc(cpu.PC));
+		elems.registerInputIFF1.checked = cpu.IFF1;
+		elems.registerInputIFF2.checked = cpu.IFF2;
+		elems.registerInputIMF_0.checked = cpu.IMF === 0;
+		elems.registerInputIMF_1.checked = cpu.IMF === 1;
+		elems.registerInputIMF_2.checked = cpu.IMF === 2;
+		elems.flagInputS.checked = cpu.F & 0x80;
+		elems.flagInputZ.checked = cpu.F & 0x40;
+		elems.flagInputH.checked = cpu.F & 0x10;
+		elems.flagInputPV.checked = cpu.F & 0x04;
+		elems.flagInputN.checked = cpu.F & 0x02;
+		elems.flagInputC.checked = cpu.F & 0x01;
 	};
-
-	const tick = (currentTime) => {
-		if (clockBudget > 0) clockBudget = 0;
-		if (running) {
-			if (budgetPreviousTime !== null) {
-				clockBudget += Math.max(0, targetSpeed * (currentTime - budgetPreviousTime) * 1000);
-			}
-			const finishTime = currentTime + 2000;
-			budgetPreviousTime = currentTime;
-			while (clockBudget > 0 && (elapsedSteps % 10000 !== 0 || performance.now() < finishTime)) {
-				const clocksDelta = CPU.step();
-				elapsedSteps++;
-				elapsedClocks += clocksDelta;
-				clockBudget -= clocksDelta;
-			}
-		}
-		renderStatus();
-		if (renderedElepsedSteps !== elapsedSteps) {
-			setContents(elems.elapsedStepsDisplay, renderNumber(elapsedSteps));
-			renderedElepsedSteps = elapsedSteps;
-		}
-		if (renderedElapsedClocks !== elapsedClocks) {
-			setContents(elems.elapsedClocksDisplay, renderNumber(elapsedClocks));
-			renderedElapsedClocks = elapsedClocks;
-		}
-		renderMemoryContents(elems.ramContents, RAMViewerCache, RAM, 0x8000, RAMdirty);
-		if (currentTime - speedPreviousTime >= 1000) {
-			const currentSpeed = (elapsedClocks - speedPreviousClocks) / (currentTime - speedPreviousTime) / 1000;
-			elems.currentSpeedDisplay.textContent = Math.max(currentSpeed, 0).toFixed(3);
-			speedPreviousTime = currentTime;
-			speedPreviousClocks = elapsedClocks;
-		}
-		requestAnimationFrame(tick);
-	};
-	tick();
 
 	elems.runButton.addEventListener("click", () => setRunning(true));
 	elems.pauseButton.addEventListener("click", () => setRunning(false));
 	elems.stepButton.addEventListener("click", () => {
-		elapsedClocks += CPU.step();
+		const clocksDelta = cpu.step();
+		elapsedClocks += clocksDelta;
 		elapsedSteps++;
+		if (targetSpeed > 0) uart.progressTime(1e-6 / targetSpeed * clocksDelta);
 	});
 	elems.resetButton.addEventListener("click", () => {
 		setRunning(false);
-		CPU.reset();
+		cpu.reset();
+		uart.reset();
 		for (let i = 0; i < RAM.length; i++) {
 			RAM[i] = 0xff;
 			RAMdirty[i] = 1;
@@ -363,6 +347,95 @@ window.addEventListener("DOMContentLoaded", () => {
 		elapsedSteps = 0;
 		elapsedClocks = 0;
 	});
+
+	let consoleAreaStatus = null;
+	const utf8Encoder = new TextEncoder();
+	const utf8Decoder = new TextDecoder();
+	const receiveBuffer = [];
+	const sendStringToUART = (str) => {
+		const normalizedData = str.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+		const useCrAsNewline = false; // TODO：UIから取得
+		const convertedData = useCrAsNewline ? normalizedData.replace(/\n/g, "\r") : normalizedData;
+		uart.addReceivedData(utf8Encoder.encode(convertedData));
+	};
+	const receiveDataFromUART = (dataArray) => {
+		let stringToAdd = "";
+		dataArray.forEach((c) => {
+			if (receiveBuffer.length > 0) {
+				if (0x80 <= c && c < 0xc0) {
+					// UTF-8の2バイト目以降
+					receiveBuffer.push(c);
+					const targetLength = receiveBuffer[0] < 0xe0 ? 2 : (receiveBuffer[0] < 0xf0 ? 3 : 4);
+					if (receiveBuffer.length >= targetLength) {
+						stringToAdd += utf8Decoder.decode(new Uint8Array(receiveBuffer));
+						receiveBuffer.splice(0);
+					}
+					return;
+				} else {
+					stringToAdd += receiveBuffer.map((c) => String.fromCharCode(c)).join("");
+					// 今回受け取った文字はあらためて下のコードで処理する
+				}
+			}
+			if (0xc0 <= c && c < 0xf8) {
+				// UTF-8の1バイト目
+				receiveBuffer.push(c);
+			} else {
+				stringToAdd += String.fromCharCode(c);
+			}
+		});
+		if (stringToAdd.length > 0) {
+			const area = elems.consoleArea;
+			const isBottomShown = area.scrollTop >= area.scrollHeight - area.clientHeight - 1;
+			const oldValue = area.value;
+			const selectionStart = area.selectionStart;
+			const selectionEnd = area.selectionEnd;
+			const selectionDirection = area.selectionDirection;
+			area.value += stringToAdd;
+			area.selectionEnd = selectionEnd;
+			area.selectionStart = selectionStart === oldValue.length ? area.value.length : selectionStart;
+			area.selectionDirection = selectionDirection;
+			if (isBottomShown) area.scrollTop = area.scrollHeight;
+		}
+	};
+	elems.consoleArea.addEventListener("beforeinput", (event) => {
+		if (event.inputType === "insertCompositionText") {
+			if (!consoleAreaStatus) {
+				consoleAreaStatus = {
+					value: elems.consoleArea.value,
+					selectionStart: elems.consoleArea.selectionStart,
+					selectionEnd: elems.consoleArea.selectionEnd,
+					selectionDirection: elems.consoleArea.selectionDirection,
+				};
+			}
+		} else {
+			event.preventDefault();
+			if (event.inputType === "insertLineBreak") {
+				sendStringToUART("\n");
+			} else if (event.inputType.startsWith("insert") && event.inputType !== "insertLink" && event.data !== null) {
+				sendStringToUART(event.data);
+			} else if (event.inputType.startsWith("delete")) {
+				if (event.inputType.endsWith("Backward")) sendStringToUART("\x08");
+				else if (event.inputType.endsWith("Forward")) sendStringToUART("\x7f");
+			}
+		}
+	});
+	elems.consoleArea.addEventListener("input", (event) => {
+		if (!event.isComposing) {
+			if (consoleAreaStatus) {
+				elems.consoleArea.value = consoleAreaStatus.value;
+				elems.consoleArea.selectionStart = consoleAreaStatus.selectionStart;
+				elems.consoleArea.selectionEnd = consoleAreaStatus.selectionEnd
+				elems.consoleArea.selectionDirection = consoleAreaStatus.selectionDirection;
+				consoleAreaStatus = null;
+			}
+			if (event.data !== null) sendStringToUART(event.data);
+		}
+	});
+
+	// TODO：UIからの設定
+	uart.localEcho = true;
+	uart.rxCharDelay = 0.010;
+	uart.rxLineDelay = 0.300;
 
 	const updateROM = () => {
 		const programData = elems.programInput.value;
@@ -457,4 +530,43 @@ window.addEventListener("DOMContentLoaded", () => {
 	};
 	elems.ramSizeInput.addEventListener("change", changeRamSize);
 	changeRamSize();
+
+	const tick = (currentTime) => {
+		if (clockBudget > 0) clockBudget = 0;
+		if (running) {
+			if (budgetPreviousTime !== null) {
+				clockBudget += Math.max(0, targetSpeed * (currentTime - budgetPreviousTime) * 1000);
+			}
+			const finishTime = currentTime + 2000;
+			budgetPreviousTime = currentTime;
+			while (clockBudget > 0 && (elapsedSteps % 10000 !== 0 || performance.now() < finishTime)) {
+				const clocksDelta = cpu.step();
+				elapsedSteps++;
+				elapsedClocks += clocksDelta;
+				clockBudget -= clocksDelta;
+				if (targetSpeed > 0) uart.progressTime(1e-6 / targetSpeed * clocksDelta);
+			}
+		}
+		renderCpuStatus();
+		if (!consoleAreaStatus) {
+			receiveDataFromUART(uart.getDataSent());
+		}
+		if (renderedElepsedSteps !== elapsedSteps) {
+			setContents(elems.elapsedStepsDisplay, renderNumber(elapsedSteps));
+			renderedElepsedSteps = elapsedSteps;
+		}
+		if (renderedElapsedClocks !== elapsedClocks) {
+			setContents(elems.elapsedClocksDisplay, renderNumber(elapsedClocks));
+			renderedElapsedClocks = elapsedClocks;
+		}
+		renderMemoryContents(elems.ramContents, RAMViewerCache, RAM, 0x8000, RAMdirty);
+		if (currentTime - speedPreviousTime >= 1000) {
+			const currentSpeed = (elapsedClocks - speedPreviousClocks) / (currentTime - speedPreviousTime) / 1000;
+			elems.currentSpeedDisplay.textContent = Math.max(currentSpeed, 0).toFixed(3);
+			speedPreviousTime = currentTime;
+			speedPreviousClocks = elapsedClocks;
+		}
+		requestAnimationFrame(tick);
+	};
+	tick();
 });

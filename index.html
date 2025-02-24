@@ -6,6 +6,7 @@
 	<link rel="icon" href="ic.ico" sizes="16x16 32x32">
 	<title>R80C26</title>
 	<script src="r80c26.js"></script>
+	<script src="uart.js"></script>
 	<script src="r80c26_ui.js"></script>
 	<link rel="stylesheet" href="index.css">
 </head>
@@ -28,6 +29,11 @@
 			<img src="lib/tabler-icons/restore.svg" alt="">
 			Reset
 		</button>
+	</div>
+	<div id="consoleWrapper">
+		<textarea id="consoleArea" rows="24" cols="80"
+			autocomplete="off" autocorrect="off" spellcheck="false"
+		></textarea>
 	</div>
 	<details id="registerInfoWrapper">
 		<summary>CPU status</summary>

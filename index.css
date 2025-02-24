@@ -25,6 +25,13 @@ summary {
 	text-align: right;
 }
 
+#consoleArea {
+	font-family: monospace;
+	color: #f0f0f0;
+	background-color: #202020;
+	scrollbar-gutter: stable;
+}
+
 #registerInfoGrid {
 	display: grid;
 	grid-template-columns: repeat(5, auto);
