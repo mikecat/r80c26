@@ -35,11 +35,7 @@ window.addEventListener("DOMContentLoaded", () => {
 		} else if (address === 0xe001) {
 			// UARTó‘Ô
 			const status = uart.getStatus();
-			return (
-				(status.rxBufferHasData ? 1 : 0) |
-				(status.txBufferHasSpace ? 2 : 0) |
-				(status.rxOverflow ? 4 : 0)
-			);
+			return (status.rxBufferHasData ? 1 : 0) | (status.txBufferHasSpace ? 2 : 0);
 		}
 		return 0xff;
 	};
