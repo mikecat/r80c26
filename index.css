@@ -25,11 +25,36 @@ summary {
 	text-align: right;
 }
 
+#clearConsoleButton {
+	margin-left: 1em;
+}
+
+#consoleWrapper {
+	display: grid;
+}
+
 #consoleArea {
+	grid-row: 1;
+	grid-column: 1;
 	font-family: monospace;
 	color: #f0f0f0;
 	background-color: #202020;
 	scrollbar-gutter: stable;
+}
+
+#consoleConfigArea {
+	grid-row: 2;
+	grid-column: 1;
+	display: flex;
+}
+
+#consoleNewlineConfigArea {
+	margin-left: auto;
+	margin-right: auto;
+}
+
+#sendDelayPerCharInput, #sendDelayPerLineInput {
+	text-align: right;
 }
 
 #registerInfoGrid {

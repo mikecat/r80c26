@@ -29,11 +29,35 @@
 			<img src="lib/tabler-icons/restore.svg" alt="">
 			Reset
 		</button>
+		<button type="button" id="clearConsoleButton">
+			<img src="lib/tabler-icons/circle-dotted.svg" alt="">
+			Clear Console
+		</button>
 	</div>
 	<div id="consoleWrapper">
 		<textarea id="consoleArea" rows="24" cols="80"
 			autocomplete="off" autocorrect="off" spellcheck="false"
 		></textarea>
+		<div id="consoleConfigArea">
+			<label for="localEchoCheck">
+				<input type="checkbox" id="localEchoCheck">
+				local echo
+			</label>
+			<div id="consoleNewlineConfigArea">
+				TX newline:
+				<label for="newlineCrRadio">
+					CR<input type="radio" name="newlineSelector" id="newlineCrRadio" checked>
+				</label>
+				<label for="newlineLfRadio">
+					LF<input type="radio" name="newlineSelector" id="newlineLfRadio">
+				</label>
+			</div>
+			<div>
+				TX delay:
+				<input type="text" id="sendDelayPerCharInput" size="4" value="0">ms/char,
+				<input type="text" id="sendDelayPerLineInput" size="4" value="0">ms/line
+			</div>
+		</div>
 	</div>
 	<details id="registerInfoWrapper">
 		<summary>CPU status</summary>

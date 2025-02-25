@@ -350,7 +350,7 @@ window.addEventListener("DOMContentLoaded", () => {
 	const receiveBuffer = [];
 	const sendStringToUART = (str) => {
 		const normalizedData = str.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-		const useCrAsNewline = false; // TODOFUI‚©‚çŽæ“¾
+		const useCrAsNewline = elems.newlineCrRadio.checked;
 		const convertedData = useCrAsNewline ? normalizedData.replace(/\n/g, "\r") : normalizedData;
 		uart.addReceivedData(utf8Encoder.encode(convertedData));
 	};
@@ -427,11 +427,28 @@ window.addEventListener("DOMContentLoaded", () => {
 			if (event.data !== null) sendStringToUART(event.data);
 		}
 	});
+	elems.clearConsoleButton.addEventListener("click", () => {
+		elems.consoleArea.value = "";
+		consoleAreaStatus = null;
+	});
 
-	// TODOFUI‚©‚ç‚ÌÝ’è
-	uart.localEcho = true;
-	uart.rxCharDelay = 0.010;
-	uart.rxLineDelay = 0.300;
+	const setUartLocalEcho = () => {
+		uart.localEcho = elems.localEchoCheck.checked;
+	};
+	const setUartDelayPerChar = () => {
+		const value = parseFloat(elems.sendDelayPerCharInput.value);
+		if (!isNaN(value) && value >= 0) uart.rxCharDelay = value / 1000.0;
+	};
+	const setUartDelayPerLine = () => {
+		const value = parseFloat(elems.sendDelayPerLineInput.value);
+		if (!isNaN(value) && value >= 0) uart.rxLineDelay = value / 1000.0;
+	};
+	elems.localEchoCheck.addEventListener("change", setUartLocalEcho);
+	elems.sendDelayPerCharInput.addEventListener("change", setUartDelayPerChar);
+	elems.sendDelayPerLineInput.addEventListener("change", setUartDelayPerLine);
+	setUartLocalEcho();
+	setUartDelayPerChar();
+	setUartDelayPerLine();
 
 	const updateROM = () => {
 		const programData = elems.programInput.value;
