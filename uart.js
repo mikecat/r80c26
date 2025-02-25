@@ -117,8 +117,7 @@ class UART {
 						const data = this.#dataToReceive.shift();
 						this.#rxRegister = data;
 						this.#rxTimeLeft = this.#timePerChar;
-						this.#rxDelayTimeLeft = this.#rxCharDelay;
-						if (data === 0x0d || data === 0x0a) this.#rxDelayTimeLeft += this.#rxLineDelay;
+						this.#rxDelayTimeLeft = data === 0x0d || data === 0x0a ? Math.max(this.#rxCharDelay, this.#rxLineDelay) : this.#rxCharDelay;
 						if (this.#localEcho) this.#dataSent.push(data);
 					} else {
 						// 次の文字が無いか受信待ち中なので、受信を終了する
@@ -135,9 +134,8 @@ class UART {
 					const data = this.#dataToReceive.shift();
 					this.#rxRegister = data;
 					this.#rxTimeLeft = this.#timePerChar;
-					this.#rxDelayTimeLeft = this.#rxCharDelay;
-					if (data === 0x0d || data === 0x0a) this.#rxDelayTimeLeft += this.#rxLineDelay;
-						if (this.#localEcho) this.#dataSent.push(data);
+					this.#rxDelayTimeLeft = data === 0x0d || data === 0x0a ? Math.max(this.#rxCharDelay, this.#rxLineDelay) : this.#rxCharDelay;
+					if (this.#localEcho) this.#dataSent.push(data);
 				} else {
 					// 次に受信する文字が無いので、受信を終了する
 					this.#rxDelayTimeLeft = 0;
