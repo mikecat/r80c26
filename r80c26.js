@@ -249,6 +249,27 @@ class R80C26 {
 									break;
 							}
 							break;
+						case 3:
+							{
+								const target = firstInsnMiddle >> 1;
+								setInsnInfo(1, 1, 6);
+								if (firstInsnMiddle & 1) { // DEC ss
+									if (target === 3) {
+										this.SP--;
+									} else {
+										const value = this.#regs8bitView.getUint16(target * 2, false);
+										this.#regs8bitView.setUint16(target * 2, value - 1, false);
+									}
+								} else { // INC ss
+									if (target === 3) {
+										this.SP++;
+									} else {
+										const value = this.#regs8bitView.getUint16(target * 2, false);
+										this.#regs8bitView.setUint16(target * 2, value + 1, false);
+									}
+								}
+							}
+							break;
 					}
 					break;
 				case 1:
