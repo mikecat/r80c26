@@ -270,6 +270,45 @@ class R80C26 {
 								}
 							}
 							break;
+						case 4: // INC r / INC (HL)
+							{
+								const target = firstInsnMiddle;
+								const value = target === 6 ? this.#readMemory(this.HL) : this.#regs8bit[target];
+								const result = (value + 1) & 0xff;
+								this.F = (this.F & 0x29) |
+									(result & 0x80 ? 0x80 : 0) |
+									(result === 0 ? 0x40 : 0) |
+									((value & 0x0f) === 0xf ? 0x10 : 0) |
+									(value === 0x7f ? 0x04 : 0);
+								if (target === 6) {
+									this.#writeMemory(this.HL, result);
+									setInsnInfo(1, 1, 11);
+								} else {
+									this.#regs8bit[target] = result;
+									setInsnInfo(1, 1, 4);
+								}
+							}
+							break;
+						case 5: // DEC r / DEC (HL)
+							{
+								const target = firstInsnMiddle;
+								const value = target === 6 ? this.#readMemory(this.HL) : this.#regs8bit[target];
+								const result = (value - 1) & 0xff;
+								this.F = (this.F & 0x29) |
+									(result & 0x80 ? 0x80 : 0) |
+									(result === 0 ? 0x40 : 0) |
+									((value & 0x0f) === 0x0 ? 0x10 : 0) |
+									(value === 0x80 ? 0x04 : 0) |
+									0x02;
+								if (target === 6) {
+									this.#writeMemory(this.HL, result);
+									setInsnInfo(1, 1, 11);
+								} else {
+									this.#regs8bit[target] = result;
+									setInsnInfo(1, 1, 4);
+								}
+							}
+							break;
 					}
 					break;
 				case 1:
