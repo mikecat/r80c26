@@ -203,6 +203,52 @@ class R80C26 {
 								}
 							}
 							break;
+						case 2:
+							switch (firstInsnMiddle) {
+								case 0: // LD (BC), A
+								case 1: // LD A, (BC)
+								case 2: // LD (DE), A
+								case 3: // LD A, (DE)
+									setInsnInfo(1, 1, 7);
+									switch (firstInsnMiddle) {
+										case 0: this.#writeMemory(this.BC, this.A); break;
+										case 1: this.A = this.#readMemory(this.BC); break;
+										case 2: this.#writeMemory(this.DE, this.A); break;
+										case 3: this.A = this.#readMemory(this.DE); break;
+									}
+									break;
+								case 4: // LD (nn), HL
+								case 5: // LD HL, (nn)
+								case 6: // LD (nn), A
+								case 7: // LD A, (nn)
+									{
+										const addrLow = fetchInst(1);
+										const addrHigh = fetchInst(2);
+										const addr = (addrHigh << 8) | addrLow;
+										switch (firstInsnMiddle) {
+											case 4:
+												this.#writeMemory(addr, this.L);
+												this.#writeMemory((addr + 1) & 0xffff, this.H);
+												setInsnInfo(3, 1, 16);
+												break;
+											case 5:
+												this.L = this.#readMemory(addr);
+												this.H = this.#readMemory((addr + 1) & 0xffff);
+												setInsnInfo(3, 1, 16);
+												break;
+											case 6:
+												this.#writeMemory(addr, this.A);
+												setInsnInfo(3, 1, 13);
+												break;
+											case 7:
+												this.A = this.#readMemory(addr);
+												setInsnInfo(3, 1, 13);
+												break;
+										}
+									}
+									break;
+							}
+							break;
 					}
 					break;
 				case 1:
