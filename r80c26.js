@@ -134,6 +134,52 @@ class R80C26 {
 			const firstInsnLow = firstInsn & 7;
 			switch (firstInsnHigh) {
 				case 0:
+					switch (firstInsnLow) {
+						case 0:
+							switch (firstInsnMiddle) {
+								case 0: // NOP
+									setInsnInfo(1, 1, 4);
+									break;
+								case 1: // EX AF, AF'
+									{
+										const tempA = this.A;
+										const tempF = this.F;
+										this.A = this.Ap;
+										this.F = this.Fp;
+										this.Ap = tempA;
+										this.Fp = tempF;
+										setInsnInfo(1, 1, 4);
+									}
+									break;
+								case 2: // DJNZ, e
+								case 3: // JR e
+								case 4: // JR NZ, e
+								case 5: // JR Z, e
+								case 6: // JP NC, e
+								case 7: // JR C, e
+									{
+										const e = fetchInst(1);
+										const dst = (currentPC + 2 + (e | (e & 0x80 ? 0xff00 : 0))) & 0xffff;
+										let taken = false;
+										switch (firstInsnMiddle) {
+											case 2: taken = --this.B; break;
+											case 3: taken = true; break;
+											case 4: taken = !(this.F & 0x40); break;
+											case 5: taken = this.F & 0x40; break;
+											case 6: taken = !(this.F & 0x01); break;
+											case 7: taken = this.F & 0x01; break;
+										}
+										setInsnInfo(2, 1, 7);
+										if (taken) {
+											nextPC = dst;
+											deltaClock = 12;
+										}
+										if (firstInsnMiddle === 2) deltaClock++;
+									}
+									break;
+							}
+							break;
+					}
 					break;
 				case 1:
 					{
