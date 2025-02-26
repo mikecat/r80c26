@@ -322,6 +322,51 @@ class R80C26 {
 								}
 							}
 							break;
+						case 7:
+							switch (firstInsnMiddle) {
+								case 0: // RLCA
+									this.F = (this.F & 0xec) | (this.A & 0x80 ? 0x01 : 0);
+									this.A = (this.A << 1) | (this.A >> 7);
+									setInsnInfo(1, 1, 4);
+									break;
+								case 1: // RRCA
+									this.F = (this.F & 0xec) | (this.A & 0x01 ? 0x01 : 0);
+									this.A = (this.A >> 1) | (this.A << 7);
+									setInsnInfo(1, 1, 4);
+									break;
+								case 2: // RLA
+									{
+										const carry = this.F & 1;
+										this.F = (this.F & 0xec) | (this.A & 0x80 ? 0x01 : 0);
+										this.A = (this.A << 1) | carry;
+										setInsnInfo(1, 1, 4);
+									}
+									break;
+								case 3: // RRA
+									{
+										const carry = this.F & 1;
+										this.F = (this.F & 0xec) | (this.A & 0x01 ? 0x01 : 0);
+										this.A = (this.A >> 1) | (carry ? 0x80 : 0);
+										setInsnInfo(1, 1, 4);
+									}
+									break;
+								case 4: // DAA
+									break;
+								case 5: // CPL
+									this.A = ~this.A;
+									this.F |= 0x12;
+									setInsnInfo(1, 1, 4);
+									break;
+								case 6: // SCF
+									this.F = (this.F & 0xec) | 0x01;
+									setInsnInfo(1, 1, 4);
+									break;
+								case 7: // CCF
+									this.F = (this.F & 0xec) | (this.F & 0x01 ? 0x10 : 0x01);
+									setInsnInfo(1, 1, 4);
+									break;
+							}
+							break;
 					}
 					break;
 				case 1:
