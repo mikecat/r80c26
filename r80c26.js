@@ -179,6 +179,30 @@ class R80C26 {
 									break;
 							}
 							break;
+						case 1:
+							if (firstInsnMiddle & 1) { // ADD HL, ss
+								const src = firstInsnMiddle >> 1;
+								const srcValue = src === 3 ? this.SP : this.#regs8bitView.getUint16(src * 2, false);
+								const halfValue = (this.HL & 0x0fff) + (srcValue & 0x0fff);
+								const value = this.HL + srcValue;
+								this.HL = value;
+								this.F = (this.F & 0xec) |
+									(halfValue >= 0x1000 ? 0x10 : 0) |
+									(value >= 0x10000 ? 0x01 : 0);
+								setInsnInfo(1, 1, 11);
+							} else { // LD dd, nn
+								const dst = firstInsnMiddle >> 1;
+								const valueLow = fetchInst(1);
+								const valueHigh = fetchInst(2);
+								const value = (valueHigh << 8) | valueLow;
+								setInsnInfo(3, 1, 10);
+								if (dst === 3) {
+									this.SP = value;
+								} else {
+									this.#regs8bitView.setUint16(dst * 2, value, false);
+								}
+							}
+							break;
 					}
 					break;
 				case 1:
