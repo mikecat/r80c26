@@ -106,11 +106,71 @@ class R80C26 {
 		this.#IFF1 = 0;
 		this.#IFF2 = 0;
 		this.#IMF = 0;
+		this.#halted = false;
 	}
 
 	// 1命令実行し、かかったクロック数を返す
 	step() {
-		this.PC++;
-		return 4;
+		const currentPC = this.PC;
+		const fetchedInstruction = [];
+		const fetchInst = (offset) => {
+			const inst = this.#readMemory((currentPC + offset) & 0xffff);
+			fetchedInstruction.push(inst);
+			return inst;
+		};
+		let nextPC = null, deltaR = null, deltaClock = null;
+
+		const firstInsn = fetchInst(0);
+		if (this.#halted) {
+			nextPC = currentPC;
+			deltaR = 1;
+			deltaClock = 4;
+		} else {
+			switch ((firstInsn >> 6) & 3) {
+				case 0:
+					break;
+				case 1:
+					{
+						const src = firstInsn & 7;
+						const dst = (firstInsn >> 3) & 7;
+						nextPC = currentPC + 1;
+						deltaR = 1;
+						deltaClock = 4;
+						if (src === 6 && dst === 6) { // HALT
+							this.#halted = true;
+						} else { // LD r, r' / LD r, (HL) / LD (HL), r
+							let data;
+							if (src === 6) {
+								data = this.#readMemory(this.HL);
+								deltaClock = 7;
+							} else {
+								data = this.#regs8bit[src];
+							}
+							if (dst === 6) {
+								this.#writeMemory(this.HL, data);
+								deltaClock = 7;
+							} else {
+								this.#regs8bit[dst] = data;
+							}
+						}
+					}
+					break;
+				case 2:
+					break;
+				case 3:
+					break;
+			}
+		}
+
+		if (nextPC === null || deltaR === null || deltaClock === null) {
+			const insn = fetchedInstruction.map((e) => {
+				const eStr = "0" + e.toString(16);
+				return eStr.substring(eStr.length - 2);
+			}).join(" ");
+			throw new Error("not implemented: " + insn);
+		}
+		this.PC = nextPC;
+		this.R = (this.R & 0x80) | ((this.R + deltaR) & 0x7f);
+		return deltaClock;
 	}
 }
