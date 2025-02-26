@@ -52,3 +52,8 @@ UARTの状態を読み込めます。書き込みは無視されます。
 
 * 1：受信バッファにデータがある (レジスタ 0xe000 から有効な値を読み込むことができる)
 * 2：送信バッファに空きがある (レジスタ 0xe000 に値を書き込むことで、送信できる)
+
+## 参考資料
+
+* [Z80 CPU User Manual - um0080.pdf](https://www.zilog.com/docs/z80/um0080.pdf)
+* [Visual Z80 Remix](https://floooh.github.io/visualz80remix/)
