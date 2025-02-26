@@ -77,6 +77,7 @@ class UART {
 			// 処理中の要素のうち、残り時間が最小のものに合わせる
 			let delta = deltaSeconds;
 			if (this.#txRegister !== null && this.#txTimeLeft < delta) delta = this.#txTimeLeft;
+			if (this.#txRegister === null && this.#txBuffer.length > 0 && this.#timePerChar < delta) delta = this.#timePerChar;
 			if (this.#rxRegister !== null && this.#rxTimeLeft < delta) delta = this.#rxTimeLeft;
 			if (this.#rxDelayTimeLeft > 0 && this.#rxDelayTimeLeft < delta) delta = this.#rxDelayTimeLeft;
 			if (delta <= 0) delta = 0;
@@ -98,6 +99,10 @@ class UART {
 						this.#txTimeLeft = 0;
 					}
 				}
+			} else if (this.#txBuffer.length > 0) {
+				// 送信中でなく、送信するデータがあったら、送信を開始する
+				this.#txRegister = this.#txBuffer.shift();
+				this.#txTimeLeft = this.#timePerChar - delta;
 			}
 			// 受信処理
 			// 仮仕様：待ち時間は受信時間を含まない、行待ちは文字待ちと別に追加する
