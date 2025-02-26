@@ -322,6 +322,11 @@ window.addEventListener("DOMContentLoaded", () => {
 		elems.flagInputPV.checked = cpu.F & 0x04;
 		elems.flagInputN.checked = cpu.F & 0x02;
 		elems.flagInputC.checked = cpu.F & 0x01;
+		if (cpu.halted) {
+			elems.haltIndicator.classList.add("halted");
+		} else {
+			elems.haltIndicator.classList.remove("halted");
+		}
 	};
 
 	elems.runButton.addEventListener("click", () => setRunning(true));
