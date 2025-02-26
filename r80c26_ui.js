@@ -327,10 +327,15 @@ window.addEventListener("DOMContentLoaded", () => {
 	elems.runButton.addEventListener("click", () => setRunning(true));
 	elems.pauseButton.addEventListener("click", () => setRunning(false));
 	elems.stepButton.addEventListener("click", () => {
-		const clocksDelta = cpu.step();
-		elapsedClocks += clocksDelta;
-		elapsedSteps++;
-		if (targetSpeed > 0) uart.progressTime(1e-6 / targetSpeed * clocksDelta);
+		try {
+			const clocksDelta = cpu.step();
+			elapsedClocks += clocksDelta;
+			elapsedSteps++;
+			if (targetSpeed > 0) uart.progressTime(1e-6 / targetSpeed * clocksDelta);
+		} catch (error) {
+			setRunning(false);
+			setTimeout(() => alert(error), 0);
+		}
 	});
 	elems.resetButton.addEventListener("click", () => {
 		setRunning(false);
@@ -553,11 +558,17 @@ window.addEventListener("DOMContentLoaded", () => {
 			const finishTime = currentTime + 2000;
 			budgetPreviousTime = currentTime;
 			while (clockBudget > 0 && (elapsedSteps % 10000 !== 0 || performance.now() < finishTime)) {
-				const clocksDelta = cpu.step();
-				elapsedSteps++;
-				elapsedClocks += clocksDelta;
-				clockBudget -= clocksDelta;
-				if (targetSpeed > 0) uart.progressTime(1e-6 / targetSpeed * clocksDelta);
+				try {
+					const clocksDelta = cpu.step();
+					elapsedSteps++;
+					elapsedClocks += clocksDelta;
+					clockBudget -= clocksDelta;
+					if (targetSpeed > 0) uart.progressTime(1e-6 / targetSpeed * clocksDelta);
+				} catch (error) {
+					setRunning(false);
+					setTimeout(() => alert(error), 0);
+					break;
+				}
 			}
 		}
 		renderCpuStatus();
