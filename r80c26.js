@@ -119,12 +119,15 @@ class R80C26 {
 			return inst;
 		};
 		let nextPC = null, deltaR = null, deltaClock = null;
+		const setInsnInfo = (nextPcOffset, _deltaR, _deltaClock) => {
+			nextPC = (currentPC + nextPcOffset) & 0xffff;
+			deltaR = _deltaR;
+			deltaClock = _deltaClock;
+		};
 
 		const firstInsn = fetchInst(0);
 		if (this.#halted) {
-			nextPC = currentPC;
-			deltaR = 1;
-			deltaClock = 4;
+			setInsnInfo(0, 1, 4);
 		} else {
 			const firstInsnHigh = (firstInsn >> 6) & 3;
 			const firstInsnMiddle = (firstInsn >> 3) & 7;
@@ -136,9 +139,7 @@ class R80C26 {
 					{
 						const src = firstInsnLow;
 						const dst = firstInsnMiddle;
-						nextPC = currentPC + 1;
-						deltaR = 1;
-						deltaClock = 4;
+						setInsnInfo(1, 1, 4);
 						if (src === 6 && dst === 6) { // HALT
 							this.#halted = true;
 						} else { // LD r, r' / LD r, (HL) / LD (HL), r
