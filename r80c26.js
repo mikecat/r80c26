@@ -309,6 +309,19 @@ class R80C26 {
 								}
 							}
 							break;
+						case 6: // LD r, n / LD (HL), n
+							{
+								const dst = firstInsnMiddle;
+								const value = fetchInst(1);
+								if (dst === 6) {
+									this.#writeMemory(this.HL, value);
+									setInsnInfo(2, 1, 10);
+								} else {
+									this.#regs8bit[dst] = value;
+									setInsnInfo(2, 1, 7);
+								}
+							}
+							break;
 					}
 					break;
 				case 1:
