@@ -126,13 +126,16 @@ class R80C26 {
 			deltaR = 1;
 			deltaClock = 4;
 		} else {
-			switch ((firstInsn >> 6) & 3) {
+			const firstInsnHigh = (firstInsn >> 6) & 3;
+			const firstInsnMiddle = (firstInsn >> 3) & 7;
+			const firstInsnLow = firstInsn & 7;
+			switch (firstInsnHigh) {
 				case 0:
 					break;
 				case 1:
 					{
-						const src = firstInsn & 7;
-						const dst = (firstInsn >> 3) & 7;
+						const src = firstInsnLow;
+						const dst = firstInsnMiddle;
 						nextPC = currentPC + 1;
 						deltaR = 1;
 						deltaClock = 4;
