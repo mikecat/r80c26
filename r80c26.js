@@ -332,19 +332,19 @@ class R80C26 {
 						case 7:
 							switch (firstInsnMiddle) {
 								case 0: // RLCA
-									this.F = (this.F & 0xec) | (this.A & 0x80 ? 0x01 : 0);
+									this.F = (this.F & 0xec) | (this.A >> 7);
 									this.A = (this.A << 1) | (this.A >> 7);
 									setInsnInfo(1, 1, 4);
 									break;
 								case 1: // RRCA
-									this.F = (this.F & 0xec) | (this.A & 0x01 ? 0x01 : 0);
+									this.F = (this.F & 0xec) | (this.A & 0x01);
 									this.A = (this.A >> 1) | (this.A << 7);
 									setInsnInfo(1, 1, 4);
 									break;
 								case 2: // RLA
 									{
 										const carry = this.F & 1;
-										this.F = (this.F & 0xec) | (this.A & 0x80 ? 0x01 : 0);
+										this.F = (this.F & 0xec) | (this.A >> 7);
 										this.A = (this.A << 1) | carry;
 										setInsnInfo(1, 1, 4);
 									}
@@ -352,8 +352,8 @@ class R80C26 {
 								case 3: // RRA
 									{
 										const carry = this.F & 1;
-										this.F = (this.F & 0xec) | (this.A & 0x01 ? 0x01 : 0);
-										this.A = (this.A >> 1) | (carry ? 0x80 : 0);
+										this.F = (this.F & 0xec) | (this.A & 0x01);
+										this.A = (this.A >> 1) | (carry << 7);
 										setInsnInfo(1, 1, 4);
 									}
 									break;
