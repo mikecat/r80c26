@@ -493,6 +493,30 @@ class R80C26 {
 					}
 					break;
 				case 3:
+					switch (firstInsnLow) {
+						case 0: // RET cc
+							{
+								let mask = 0;
+								switch (firstInsnMiddle & 6) {
+									case 0: mask = 0x40; break; // Z
+									case 2: mask = 0x01; break; // C
+									case 4: mask = 0x04; break; // P/V
+									case 6: mask = 0x80; break; // S
+								}
+								const flag = this.F & mask;
+								const taken = firstInsnMiddle & 1 ? flag : !flag;
+								if (taken) {
+									const newPcLow = this.#readMemory(this.SP);
+									const newPcHigh = this.#readMemory((this.SP + 1) & 0xffff);
+									this.SP += 2;
+									setInsnInfo(0, 1, 11);
+									nextPC = newPcLow | (newPcHigh << 8);
+								} else {
+									setInsnInfo(1, 1, 5);
+								}
+							}
+							break;
+					}
 					break;
 			}
 		}
