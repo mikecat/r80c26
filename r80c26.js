@@ -56,6 +56,14 @@ class R80C26 {
 	set DE(value) { this.#regs8bitView.setUint16(2, value, false); }
 	get HL() { return this.#regs8bitView.getUint16(4, false); }
 	set HL(value) { this.#regs8bitView.setUint16(4, value, false); }
+	get AFp() { return this.#regs8bitView.getUint16(14, true); }
+	set AFp(value) { this.#regs8bitView.setUint16(14, value, true); }
+	get BCp() { return this.#regs8bitView.getUint16(8, false); }
+	set BCp(value) { this.#regs8bitView.setUint16(8, value, false); }
+	get DEp() { return this.#regs8bitView.getUint16(10, false); }
+	set DEp(value) { this.#regs8bitView.setUint16(10, value, false); }
+	get HLp() { return this.#regs8bitView.getUint16(12, false); }
+	set HLp(value) { this.#regs8bitView.setUint16(12, value, false); }
 
 	get IX() { return this.#regs16bit[0]; }
 	set IX(value) { this.#regs16bit[0] = value; }
@@ -513,6 +521,49 @@ class R80C26 {
 									nextPC = newPcLow | (newPcHigh << 8);
 								} else {
 									setInsnInfo(1, 1, 5);
+								}
+							}
+							break;
+						case 1:
+							if ((firstInsnMiddle & 1) === 0) { // POP qq
+								const valueLow = this.#readMemory(this.SP);
+								const valueHigh = this.#readMemory((this.SP + 1) & 0xffff);
+								const value = valueLow | (valueHigh << 8);
+								this.SP += 2;
+								if (firstInsnMiddle === 6) {
+									this.HF = value;
+								} else {
+									this.#regs8bitView.setUint16(0, value, false);
+								}
+								setInsnInfo(1, 1, 10);
+							} else {
+								switch (firstInsnMiddle) {
+									case 1: // RET
+										{
+											const newPcLow = this.#readMemory(this.SP);
+											const newPcHigh = this.#readMemory((this.SP + 1) & 0xffff);
+											this.SP += 2;
+											setInsnInfo(0, 1, 10);
+											nextPC = newPcLow | (newPcHigh << 8);
+										}
+										break;
+									case 3: // EXX
+										{
+											let temp;
+											temp = this.BC; this.BC = this.BCp; this.BCp = temp;
+											temp = this.DE; this.DE = this.DEp; this.DEp = temp;
+											temp = this.HL; this.HL = this.HLp; this.HLp = temp;
+											setInsnInfo(1, 1, 4);
+										}
+										break;
+									case 5: // JP (HL)
+										setInsnInfo(0, 1, 4);
+										nextPC = this.HL;
+										break;
+									case 7: // LD SP, HL
+										this.SP = this.HL;
+										setInsnInfo(1, 1, 6);
+										break;
 								}
 							}
 							break;
