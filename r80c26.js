@@ -97,6 +97,13 @@ class R80C26 {
 		this.#writeIO = writeIO || (() => {});
 	}
 
+	static #isEvenParity8bit(value) {
+		value ^= value >> 1;
+		value ^= value >> 2;
+		value ^= value >> 4;
+		return !(value & 1);
+	}
+
 	// CPUをリセットする
 	reset() {
 		// IFF1, IFF2, PC, I, R, IMF については、リセット時に0にすることがUM0080で明示されている
@@ -351,6 +358,42 @@ class R80C26 {
 									}
 									break;
 								case 4: // DAA
+									{
+										const curA = this.A, curF = this.F;
+										const Alower = curA & 0xf;
+										const curN = curF & 2, curC = curF & 1, curH = curF & 0x10;
+										let Adelta = 0, newC = 0, newH = 0;
+										if (curN) {
+											if (curC || curA >= 0x9a) {
+												Adelta = 0x9a;
+												newC = 1;
+											} else {
+												Adelta = 0xfa;
+												newC = 0;
+											}
+											if (!curH && Alower <= 9) Adelta += 6;
+											newH = curH && Alower <= 5 ? 1 : 0;
+										} else {
+											if (curC || curA >= 0x9a) {
+												Adelta = 0x60;
+												newC = 1;
+											} else {
+												Adelta = 0x00;
+												newC = 0;
+											}
+											if (curH || Alower >= 0xa) Adelta += 6;
+											newH = Alower >= 0xa ? 1 : 0;
+										}
+										const newA = (curA + Adelta) & 0xff;
+										this.A = newA;
+										this.F = (curF & 0x2a) |
+											(newA & 0x80) |
+											(newA === 0 ? 0x40 : 0) |
+											(newH << 4) |
+											(R80C26.#isEvenParity8bit(newA) ? 0x04 : 0) |
+											newC;
+										setInsnInfo(1, 1, 4);
+									}
 									break;
 								case 5: // CPL
 									this.A = ~this.A;
