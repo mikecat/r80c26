@@ -567,6 +567,23 @@ class R80C26 {
 								}
 							}
 							break;
+						case 2: // JP cc, nn
+							{
+								const destLow = fetchInst(1);
+								const destHigh = fetchInst(2);
+								let mask = 0;
+								switch (firstInsnMiddle & 6) {
+									case 0: mask = 0x40; break; // Z
+									case 2: mask = 0x01; break; // C
+									case 4: mask = 0x04; break; // P/V
+									case 6: mask = 0x80; break; // S
+								}
+								const flag = this.F & mask;
+								const taken = firstInsnMiddle & 1 ? flag : !flag;
+								setInsnInfo(3, 1, 10);
+								if (taken) nextPC = destLow | (destHigh << 8);
+							}
+							break;
 					}
 					break;
 			}
