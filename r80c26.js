@@ -283,7 +283,7 @@ class R80C26 {
 								const value = target === 6 ? this.#readMemory(this.HL) : this.#regs8bit[target];
 								const result = (value + 1) & 0xff;
 								this.F = (this.F & 0x29) |
-									(result & 0x80 ? 0x80 : 0) |
+									(result & 0x80) |
 									(result === 0 ? 0x40 : 0) |
 									((value & 0x0f) === 0xf ? 0x10 : 0) |
 									(value === 0x7f ? 0x04 : 0);
@@ -302,7 +302,7 @@ class R80C26 {
 								const value = target === 6 ? this.#readMemory(this.HL) : this.#regs8bit[target];
 								const result = (value - 1) & 0xff;
 								this.F = (this.F & 0x29) |
-									(result & 0x80 ? 0x80 : 0) |
+									(result & 0x80) |
 									(result === 0 ? 0x40 : 0) |
 									((value & 0x0f) === 0x0 ? 0x10 : 0) |
 									(value === 0x80 ? 0x04 : 0) |
