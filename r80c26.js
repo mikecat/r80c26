@@ -104,6 +104,54 @@ class R80C26 {
 		return !(value & 1);
 	}
 
+	// Aレジスタと値valueの演算を行い、Aレジスタとフラグを更新する
+	#arith8bit(value, kind) {
+		switch (kind) {
+			case 0: // ADD
+			case 1: // ADC
+			case 2: // SUB
+			case 3: // SBC
+			case 7: // CP
+				{
+					const isAdd = kind === 0 || kind === 1;
+					const useCarry = kind === 1 || kind === 3;
+					const a = this.A;
+					const b = (isAdd ? value : ~value) & 0xff;
+					const c = ((useCarry ? this.F : 0) ^ (isAdd ? 0 : 1)) & 1;
+					const sum = a + b + c;
+					const halfSum = (a & 0xf) + (b & 0xf) + c;
+					const carry = sum & 0x100;
+					const halfCarry = halfSum & 0x10;
+					const overflow = (a & 0x80) === (b & 0x80) && (a & 0x80) !== (sum & 0x80);
+					this.F = (this.F & 0x28) |
+						(sum & 0x80) |
+						((sum & 0xff) === 0 ? 0x40 : 0) |
+						((isAdd ? halfCarry : !halfCarry) ? 0x10 : 0) |
+						(overflow ? 0x04 : 0) |
+						(isAdd ? 0 : 0x02) |
+						((isAdd ? carry : !carry) ? 0x01 : 0);
+					if (kind !== 7) this.A = sum;
+				}
+				break;
+			case 4: // AND
+			case 5: // OR
+			case 6: // XOR
+				{
+					const res =
+						kind === 4 ? this.A & value :
+						kind === 5 ? this.A | value :
+						this.A ^ value;
+					this.A = res;
+					this.F = (this.F & 0x28) |
+						(res & 0x80) |
+						(res === 0 ? 0x40 : 0) |
+						(kind === 4 ? 0x10 : 0) |
+						(R80C26.#isEvenParity8bit(res) ? 0x04 : 0);
+				}
+				break;
+		}
+	}
+
 	// CPUをリセットする
 	reset() {
 		// IFF1, IFF2, PC, I, R, IMF については、リセット時に0にすることがUM0080で明示されている
@@ -436,7 +484,13 @@ class R80C26 {
 						}
 					}
 					break;
-				case 2:
+				case 2: // ADD/ADC/SUB/SBC/AND/OR/XOR/CP A, r/(HL)
+					{
+						const src = firstInsnLow;
+						const value = src === 6 ? this.#readMemory(this.HL) : this.#regs8bit[src];
+						setInsnInfo(1, 1, src === 6 ? 7 : 4);
+						this.#arith8bit(value, firstInsnMiddle);
+					}
 					break;
 				case 3:
 					break;
