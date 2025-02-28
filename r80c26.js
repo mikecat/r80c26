@@ -187,6 +187,7 @@ class R80C26 {
 			deltaR = _deltaR;
 			deltaClock = _deltaClock;
 		};
+		let preventSampleInterrupt = false;
 
 		const firstInsn = fetchInst(0);
 		if (this.#halted) {
@@ -584,6 +585,138 @@ class R80C26 {
 								if (taken) nextPC = destLow | (destHigh << 8);
 							}
 							break;
+						case 3:
+							switch (firstInsnMiddle) {
+								case 0: // JP nn
+									{
+										const destLow = fetchInst(1);
+										const destHigh = fetchInst(2);
+										setInsnInfo(3, 1, 10);
+										nextPC = destLow | (destHigh << 8);
+									}
+									break;
+								case 1:
+									{
+										const secondInsn = fetchInst(1);
+										const secondInsnUpper = secondInsn >> 6;
+										if (secondInsnUpper === 0) {
+											const kind = (secondInsn >> 3) & 7;
+											if (kind !== 6) { // RLC/RL/RRC/RR/SLA/SRA/SRL r/(HL)
+												const target = secondInsn & 7;
+												const srcValue = target === 6 ? this.#readMemory(this.HL) : this.#regs8bit[target];
+												const carry = this.F & 1;
+												let value = 0, newCarry = 0;
+												switch (kind) {
+													case 0: // RLC
+														value = ((srcValue << 1) | (srcValue >> 7)) & 0xff;
+														newCarry = srcValue & 0x80;
+														break;
+													case 1: // RRC
+														value = ((srcValue >> 1) | (srcValue << 7)) & 0xff;
+														newCarry = srcValue & 1;
+														break;
+													case 2: // RL
+														value = ((srcValue << 1) | carry) & 0xff;
+														newCarry = srcValue & 0x80;
+														break;
+													case 3: // RR
+														value = ((srcValue >> 1) | (carry << 7)) & 0xff;
+														newCarry = srcValue & 1;
+														break;
+													case 4: // SLA
+														value = (srcValue << 1) & 0xff;
+														newCarry = srcValue & 0x80;
+														break;
+													case 5: // SRA
+														value = (srcValue & 0x80) | (srcValue >> 1);
+														newCarry = srcValue & 1;
+														break;
+													case 7: // SRL
+														value = srcValue >> 1;
+														newCarry = srcValue & 1;
+														break;
+												}
+												this.F = (this.F & 0x28) |
+													(value & 0x80) |
+													(value === 0 ? 0x40 : 0) |
+													(R80C26.#isEvenParity8bit(value) ? 0x04 : 0) |
+													(newCarry ? 0x01 : 0);
+												if (target === 6) {
+													this.#writeMemory(this.HL, value);
+													setInsnInfo(2, 2, 15);
+												} else {
+													this.#regs8bit[target] = value;
+													setInsnInfo(2, 2, 8);
+												}
+											}
+										} else { // BIT/SET/RES b, r/(HL)
+											const target = secondInsn & 7;
+											const bit = (secondInsn >> 3) & 7;
+											const srcValue = target === 6 ? this.#readMemory(this.HL) : this.#regs8bit[target];
+											if (secondInsnUpper === 1) { // BIT
+												this.F = (this.F & 0xad) | ((srcValue >> bit) & 1 ? 0 : 0x40) | 0x10;
+												setInsnInfo(2, 2, target === 6 ? 12 : 8);
+											} else { // SET/RES
+												const value = secondInsnUpper === 3 ? srcValue | (1 << bit) : srcValue & ~(1 << bit);
+												if (target === 6) {
+													this.#writeMemory(this.HL, value);
+													setInsnInfo(2, 2, 15);
+												} else {
+													this.#regs8bit[target] = value;
+													setInsnInfo(2, 2, 8);
+												}
+											}
+										}
+									}
+									break;
+								case 2: // OUT (n), A
+									{
+										const addr = fetchInst(1);
+										this.#writeIO((this.A << 8) | addr, this.A);
+										setInsnInfo(2, 1, 11);
+									}
+									break;
+								case 3: // IN A, (n)
+									{
+										const addr = fetchInst(1);
+										this.A = this.#readIO((this.A << 8) | addr);
+										setInsnInfo(2, 1, 11);
+									}
+									break;
+								case 4: // EX (SP), HL
+									{
+										const tempH = this.H, tempL = this.L;
+										const lowAddress = this.SP;
+										const highAddress = (lowAddress + 1) & 0xffff;
+										this.L = this.#readMemory(lowAddress);
+										this.H = this.#readMemory(highAddress);
+										this.#writeMemory(highAddress, tempH);
+										this.#writeMemory(lowAddress, tempL);
+										setInsnInfo(1, 1, 19);
+									}
+									break;
+								case 5: // EX DE, HL
+									{
+										const temp = this.DE;
+										this.DE = this.HL;
+										this.HL = temp;
+										setInsnInfo(1, 1, 4);
+									}
+									break;
+								case 6: // DI
+									this.IFF1 = 0;
+									this.IFF2 = 0;
+									preventSampleInterrupt = true;
+									setInsnInfo(1, 1, 4);
+									break;
+								case 7: // EI
+									this.IFF1 = 1;
+									this.IFF2 = 1;
+									preventSampleInterrupt = true;
+									setInsnInfo(1, 1, 4);
+									break;
+							}
+							break;
 					}
 					break;
 			}
@@ -598,6 +731,9 @@ class R80C26 {
 		}
 		this.PC = nextPC;
 		this.R = (this.R & 0x80) | ((this.R + deltaR) & 0x7f);
+		if (!preventSampleInterrupt) {
+			// TODO: 割り込み (~INTピン) チェック
+		}
 		return deltaClock;
 	}
 }
