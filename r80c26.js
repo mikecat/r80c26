@@ -717,6 +717,23 @@ class R80C26 {
 									break;
 							}
 							break;
+						case 6: // ADD/ADC/SUB/SBC/AND/OR/XOR/CP A, n
+							{
+								const value = fetchInst(1);
+								this.#arith8bit(value, firstInsnMiddle);
+								setInsnInfo(2, 1, 7);
+							}
+							break;
+						case 7: // RST p
+							{
+								const pcToSave = (currentPC + 1) & 0xffff;
+								this.SP -= 2;
+								this.#writeMemory((this.SP + 1) & 0xffff, pcToSave >> 8);
+								this.#writeMemory(this.SP, pcToSave & 0xff);
+								setInsnInfo(0, 1, 11);
+								nextPC = firstInsnMiddle * 8;
+							}
+							break;
 					}
 					break;
 			}
