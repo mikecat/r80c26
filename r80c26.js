@@ -536,9 +536,9 @@ class R80C26 {
 								const value = valueLow | (valueHigh << 8);
 								this.SP += 2;
 								if (firstInsnMiddle === 6) {
-									this.HF = value;
+									this.AF = value;
 								} else {
-									this.#regs8bitView.setUint16(0, value, false);
+									this.#regs8bitView.setUint16(firstInsnMiddle, value, false);
 								}
 								setInsnInfo(1, 1, 10);
 							} else {
