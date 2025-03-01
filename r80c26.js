@@ -730,6 +730,30 @@ class R80C26 {
 								}
 							}
 							break;
+						case 5:
+							if ((firstInsnMiddle & 1) === 0) { // PUSH qq
+								const value = firstInsnMiddle === 6 ? this.AF : this.#regs8bitView.getUint16(firstInsnMiddle, false);
+								this.SP -= 2;
+								this.#writeMemory((this.SP + 1) & 0xffff, value >> 8);
+								this.#writeMemory(this.SP, value & 0xff);
+								setInsnInfo(1, 1, 11);
+							} else {
+								switch (firstInsnMiddle) {
+									case 1: // CALL nn
+										{
+											const destLow = fetchInst(1);
+											const destHigh = fetchInst(2);
+											const pcToSave = (currentPC + 3) & 0xffff;
+											this.SP -= 2;
+											this.#writeMemory((this.SP + 1) & 0xffff, pcToSave >> 8);
+											this.#writeMemory(this.SP, pcToSave & 0xff);
+											setInsnInfo(3, 1, 17);
+											nextPC = destLow | (destHigh << 8);
+										}
+										break;
+								}
+							}
+							break;
 						case 6: // ADD/ADC/SUB/SBC/AND/OR/XOR/CP A, n
 							{
 								const value = fetchInst(1);
