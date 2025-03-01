@@ -142,13 +142,13 @@ class R80C26 {
 				}
 				break;
 			case 4: // AND
-			case 5: // OR
-			case 6: // XOR
+			case 5: // XOR
+			case 6: // OR
 				{
 					const res =
 						kind === 4 ? this.A & value :
-						kind === 5 ? this.A | value :
-						this.A ^ value;
+						kind === 5 ? this.A ^ value :
+						this.A | value;
 					this.A = res;
 					this.F = (this.F & 0x28) |
 						(res & 0x80) |
