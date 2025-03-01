@@ -30,10 +30,10 @@ window.addEventListener("DOMContentLoaded", () => {
 		} else if (RAM_START <= address && address < RAM_START + RAM.length) {
 			return RAM[address - RAM_START];
 		} else if (address === 0xe000) {
-			// UARTóM
+			// UARTå—ä¿¡
 			return uart.readDataRegister() & 0xff;
 		} else if (address === 0xe001) {
-			// UARTó‘Ô
+			// UARTçŠ¶æ…‹
 			const status = uart.getStatus();
 			return (status.rxBufferHasData ? 1 : 0) | (status.txBufferHasSpace ? 2 : 0);
 		}
@@ -45,7 +45,7 @@ window.addEventListener("DOMContentLoaded", () => {
 			RAM[address - RAM_START] = data;
 			RAMdirty[address - RAM_START] = 1;
 		} else if (address === 0xe000) {
-			// UART‘—M
+			// UARTé€ä¿¡
 			uart.writeDataRegister(data);
 		}
 	};
@@ -82,8 +82,8 @@ window.addEventListener("DOMContentLoaded", () => {
 	};
 	setRunning(false);
 
-	// dirty ‚ªw’è‚³‚ê‚Ä‚¢‚È‚¢‚Æ‚«AƒTƒCƒY‚Ì•ÏX‚àŠÜ‚ß‚½ƒtƒ‹“¯Šú‚ğs‚¤
-	// dirty ‚ªw’è‚³‚ê‚Ä‚¢‚é‚Æ‚«AƒTƒCƒY‚Ì•ÏX‚Í–³‚¢‚Æ‰¼’è‚µA•Ï‰»‚µ‚½•”•ª‚Ì‚İXV‚·‚é
+	// dirty ãŒæŒ‡å®šã•ã‚Œã¦ã„ãªã„ã¨ãã€ã‚µã‚¤ã‚ºã®å¤‰æ›´ã‚‚å«ã‚ãŸãƒ•ãƒ«åŒæœŸã‚’è¡Œã†
+	// dirty ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹ã¨ãã€ã‚µã‚¤ã‚ºã®å¤‰æ›´ã¯ç„¡ã„ã¨ä»®å®šã—ã€å¤‰åŒ–ã—ãŸéƒ¨åˆ†ã®ã¿æ›´æ–°ã™ã‚‹
 	const renderMemoryContents = (element, cache, data, addressOffset, dirty = null) => {
 		for (let i = 0; i < data.length; i += 16) {
 			let lineDirty = !dirty;
@@ -193,7 +193,7 @@ window.addEventListener("DOMContentLoaded", () => {
 		element.appendChild(contents);
 	};
 
-	// ”ñ•‰®”‚ğ3Œ…‚¸‚Â‹æØ‚é
+	// éè² æ•´æ•°ã‚’3æ¡ãšã¤åŒºåˆ‡ã‚‹
 	const renderNumber = (value) => {
 		const result = document.createElement("span");
 		result.classList.add("splittedNumber");
@@ -369,7 +369,7 @@ window.addEventListener("DOMContentLoaded", () => {
 		dataArray.forEach((c) => {
 			if (receiveBuffer.length > 0) {
 				if (0x80 <= c && c < 0xc0) {
-					// UTF-8‚Ì2ƒoƒCƒg–ÚˆÈ~
+					// UTF-8ã®2ãƒã‚¤ãƒˆç›®ä»¥é™
 					receiveBuffer.push(c);
 					const targetLength = receiveBuffer[0] < 0xe0 ? 2 : (receiveBuffer[0] < 0xf0 ? 3 : 4);
 					if (receiveBuffer.length >= targetLength) {
@@ -379,11 +379,11 @@ window.addEventListener("DOMContentLoaded", () => {
 					return;
 				} else {
 					stringToAdd += receiveBuffer.map((c) => String.fromCharCode(c)).join("");
-					// ¡‰ñó‚¯æ‚Á‚½•¶š‚Í‚ ‚ç‚½‚ß‚Ä‰º‚ÌƒR[ƒh‚Åˆ—‚·‚é
+					// ä»Šå›å—ã‘å–ã£ãŸæ–‡å­—ã¯ã‚ã‚‰ãŸã‚ã¦ä¸‹ã®ã‚³ãƒ¼ãƒ‰ã§å‡¦ç†ã™ã‚‹
 				}
 			}
 			if (0xc0 <= c && c < 0xf8) {
-				// UTF-8‚Ì1ƒoƒCƒg–Ú
+				// UTF-8ã®1ãƒã‚¤ãƒˆç›®
 				receiveBuffer.push(c);
 			} else {
 				stringToAdd += String.fromCharCode(c);
@@ -465,7 +465,7 @@ window.addEventListener("DOMContentLoaded", () => {
 		const newRom = new Uint8Array(0x8000);
 		for (let i = 0; i < newRom.length; i++) newRom[i] = 0xff;
 		let newRomSize = 0;
-		// Intel HEX ‚Æ‰¼’è‚µ‚Äƒp[ƒX‚·‚é
+		// Intel HEX ã¨ä»®å®šã—ã¦ãƒ‘ãƒ¼ã‚¹ã™ã‚‹
 		const lines = programData.split(/[\r\n]/);
 		let validHexLineFound = false;
 		let hexOffset = 0;
@@ -481,7 +481,7 @@ window.addEventListener("DOMContentLoaded", () => {
 				for (let j = 0; j < lineData.length; j++) checksum += lineData[j];
 				if (checksum % 0x100 !== 0) continue;
 				switch (lineData[3]) {
-					case 0: // ƒf[ƒ^
+					case 0: // ãƒ‡ãƒ¼ã‚¿
 						{
 							const startAddress = (lineData[1] << 8) | lineData[2];
 							for (let j = 0; j < lineData[0]; j++) {
@@ -497,28 +497,28 @@ window.addEventListener("DOMContentLoaded", () => {
 					case 1: // End Of File
 						if (lineData[0] === 0) validHexLineFound = true;
 						break;
-					case 2: // Šg’£ƒZƒOƒƒ“ƒgƒAƒhƒŒƒX
+					case 2: // æ‹¡å¼µã‚»ã‚°ãƒ¡ãƒ³ãƒˆã‚¢ãƒ‰ãƒ¬ã‚¹
 						if (lineData[0] === 2) {
 							hexOffset = ((lineData[4] << 8) | lineData[5]) << 4;
 							validHexLineFound = true;
 						}
 						break;
-					case 3: // ŠJnƒZƒOƒƒ“ƒgƒAƒhƒŒƒX
+					case 3: // é–‹å§‹ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã‚¢ãƒ‰ãƒ¬ã‚¹
 						if (lineData[0] === 4) validHexLineFound = true;
 						break;
-					case 4: // Šg’£ƒŠƒjƒAƒAƒhƒŒƒX
+					case 4: // æ‹¡å¼µãƒªãƒ‹ã‚¢ã‚¢ãƒ‰ãƒ¬ã‚¹
 						if (lineData[0] === 2) {
 							hexOffset = ((lineData[4] << 8) | lineData[5]) * 0x10000;
 							validHexLineFound = true;
 						}
 						break;
-					case 5: // ŠJnƒŠƒjƒAƒAƒhƒŒƒX
+					case 5: // é–‹å§‹ãƒªãƒ‹ã‚¢ã‚¢ãƒ‰ãƒ¬ã‚¹
 						if (lineData[0] === 4) validHexLineFound = true;
 						break;
 				}
 			}
 		}
-		// Intel HEX ‚¶‚á‚È‚³‚»‚¤‚È‚çA”z—ñƒf[ƒ^‚Æ‚µ‚Äƒp[ƒX‚·‚é
+		// Intel HEX ã˜ã‚ƒãªã•ãã†ãªã‚‰ã€é…åˆ—ãƒ‡ãƒ¼ã‚¿ã¨ã—ã¦ãƒ‘ãƒ¼ã‚¹ã™ã‚‹
 		if (!validHexLineFound) {
 			const arrayElements = programData.split(",");
 			for (let i = 0; i < arrayElements.length && i < newRom.length; i++) {
@@ -529,7 +529,7 @@ window.addEventListener("DOMContentLoaded", () => {
 				}
 			}
 		}
-		// “¾‚ç‚ê‚½ƒf[ƒ^‚ğ“K—p‚·‚é
+		// å¾—ã‚‰ã‚ŒãŸãƒ‡ãƒ¼ã‚¿ã‚’é©ç”¨ã™ã‚‹
 		ROM = new Uint8Array(newRomSize);
 		for (let i = 0; i < newRomSize; i++) ROM[i] = newRom[i];
 		elems.romSizeArea.textContent = (newRomSize / 1024).toFixed(2);
