@@ -358,6 +358,7 @@ window.addEventListener("DOMContentLoaded", () => {
 	const utf8Encoder = new TextEncoder();
 	const utf8Decoder = new TextDecoder();
 	const receiveBuffer = [];
+	let prevReceivedIsCR = false;
 	const sendStringToUART = (str) => {
 		const normalizedData = str.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 		const useCrAsNewline = elems.newlineCrRadio.checked;
@@ -376,6 +377,7 @@ window.addEventListener("DOMContentLoaded", () => {
 						stringToAdd += utf8Decoder.decode(new Uint8Array(receiveBuffer));
 						receiveBuffer.splice(0);
 					}
+					prevReceivedIsCR = false;
 					return;
 				} else {
 					stringToAdd += receiveBuffer.map((c) => String.fromCharCode(c)).join("");
@@ -385,9 +387,16 @@ window.addEventListener("DOMContentLoaded", () => {
 			if (0xc0 <= c && c < 0xf8) {
 				// UTF-8の1バイト目
 				receiveBuffer.push(c);
+			} else if (c === 0x0d) {
+				// CR
+				stringToAdd += "\n";
+			} else if (c === 0x0a) {
+				// LF
+				if (!prevReceivedIsCR) stringToAdd += "\n";
 			} else {
 				stringToAdd += String.fromCharCode(c);
 			}
+			prevReceivedIsCR = c === 0x0d;
 		});
 		if (stringToAdd.length > 0) {
 			const area = elems.consoleArea;
@@ -440,6 +449,8 @@ window.addEventListener("DOMContentLoaded", () => {
 	elems.clearConsoleButton.addEventListener("click", () => {
 		elems.consoleArea.value = "";
 		consoleAreaStatus = null;
+		receiveBuffer.splice(0);
+		prevReceivedIsCR = false;
 	});
 
 	const setUartLocalEcho = () => {
