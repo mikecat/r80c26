@@ -160,6 +160,18 @@ class R80C26 {
 		}
 	}
 
+	#checkCondition(cc) {
+		let mask = 0;
+		switch (cc & 6) {
+			case 0: mask = 0x40; break; // Z
+			case 2: mask = 0x01; break; // C
+			case 4: mask = 0x04; break; // P/V
+			case 6: mask = 0x80; break; // S
+		}
+		const flag = this.F & mask;
+		return cc & 1 ? flag : !flag;
+	}
+
 	// CPUをリセットする
 	reset() {
 		// IFF1, IFF2, PC, I, R, IMF については、リセット時に0にすることがUM0080で明示されている
@@ -505,15 +517,7 @@ class R80C26 {
 					switch (firstInsnLow) {
 						case 0: // RET cc
 							{
-								let mask = 0;
-								switch (firstInsnMiddle & 6) {
-									case 0: mask = 0x40; break; // Z
-									case 2: mask = 0x01; break; // C
-									case 4: mask = 0x04; break; // P/V
-									case 6: mask = 0x80; break; // S
-								}
-								const flag = this.F & mask;
-								const taken = firstInsnMiddle & 1 ? flag : !flag;
+								const taken = this.#checkCondition(firstInsnMiddle);
 								if (taken) {
 									const newPcLow = this.#readMemory(this.SP);
 									const newPcHigh = this.#readMemory((this.SP + 1) & 0xffff);
@@ -572,15 +576,7 @@ class R80C26 {
 							{
 								const destLow = fetchInst(1);
 								const destHigh = fetchInst(2);
-								let mask = 0;
-								switch (firstInsnMiddle & 6) {
-									case 0: mask = 0x40; break; // Z
-									case 2: mask = 0x01; break; // C
-									case 4: mask = 0x04; break; // P/V
-									case 6: mask = 0x80; break; // S
-								}
-								const flag = this.F & mask;
-								const taken = firstInsnMiddle & 1 ? flag : !flag;
+								const taken = this.#checkCondition(firstInsnMiddle);
 								setInsnInfo(3, 1, 10);
 								if (taken) nextPC = destLow | (destHigh << 8);
 							}
@@ -715,6 +711,23 @@ class R80C26 {
 									preventSampleInterrupt = true;
 									setInsnInfo(1, 1, 4);
 									break;
+							}
+							break;
+						case 4: // CALL cc, nn
+							{
+								const destLow = fetchInst(1);
+								const destHigh = fetchInst(2);
+								const taken = this.#checkCondition(firstInsnMiddle);
+								if (taken) {
+									const pcToSave = (currentPC + 3) & 0xffff;
+									this.SP -= 2;
+									this.#writeMemory((this.SP + 1) & 0xffff, pcToSave >> 8);
+									this.#writeMemory(this.SP, pcToSave & 0xff);
+									setInsnInfo(3, 1, 17);
+									nextPC = destLow | (destHigh << 8);
+								} else {
+									setInsnInfo(3, 1, 10);
+								}
 							}
 							break;
 						case 6: // ADD/ADC/SUB/SBC/AND/OR/XOR/CP A, n
