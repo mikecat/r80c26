@@ -751,6 +751,203 @@ class R80C26 {
 											nextPC = destLow | (destHigh << 8);
 										}
 										break;
+									case 5: // 0xED
+										{
+											const secondInsn = fetchInst(1);
+											const secondInsnUpper = secondInsn >> 6;
+											const secondInsnMiddle = (secondInsn >> 3) & 7;
+											const secondInsnLower = secondInsn & 7;
+											switch (secondInsnUpper) {
+												case 1:
+													switch (secondInsnLower) {
+														case 0: // IN r, (C)
+															{
+																const dst = secondInsnMiddle;
+																const value = this.#readIO(this.BC);
+																this.F = (this.F & 0x29) |
+																	(value & 0x80) |
+																	(value === 0 ? 0x40 : 0) |
+																	(R80C26.#isEvenParity8bit(value) ? 0x04 : 0);
+																if (dst !== 6) this.#regs8bit[dst] = value;
+																setInsnInfo(2, 2, 12);
+															}
+															break;
+														case 1: // OUT (C), r
+															if (secondInsnMiddle !== 6) {
+																this.#writeIO(this.BC, this.#regs8bit[secondInsnMiddle]);
+																setInsnInfo(2, 2, 12);
+															}
+															break;
+														case 2: // SBC/ADC HL, ss
+															{
+																const src = secondInsnMiddle & 6;
+																const srcValue = src === 6 ? this.SP : this.#regs8bitView.getUint16(src, false);
+																const value = this.HL;
+																const carry = this.F & 1;
+																if (secondInsnMiddle & 1) { // ADC HL, ss
+																	const result = value + srcValue + carry;
+																	const resultH = (value & 0xfff) + (srcValue & 0xfff) + carry;
+																	const overflow = (value & 0x8000) === (srcValue & 0x8000) && (value & 0x8000 !== result & 0x8000);
+																	this.HL = result;
+																	this.F = (this.F & 0x28) |
+																		(result & 0x8000 ? 0x80 : 0) |
+																		(this.HL === 0 ? 0x40 : 0) |
+																		(resultH & 0x1000 ? 0x10 : 0) |
+																		(overflow ? 0x04 : 0) |
+																		(result & 0x10000 ? 0x01 : 0);
+																} else { // SBC HL, ss
+																	const srcValueInv = srcValue ^ 0xffff, carryInv = carry ^ 1;
+																	const result = value + srcValueInv + carryInv;
+																	const resultH = (value & 0xfff) + (srcValueInv & 0xfff) + carryInv;
+																	const overflow = (value & 0x8000) === (srcValueInv & 0x8000) && (value & 0x8000 !== result & 0x8000);
+																	this.HL = result;
+																	this.F = (this.F & 0x28) |
+																		(result & 0x8000 ? 0x80 : 0) |
+																		(this.HL === 0 ? 0x40 : 0) |
+																		(resultH & 0x1000 ? 0 : 0x10) |
+																		(overflow ? 0x04 : 0) |
+																		0x02 |
+																		(result & 0x10000 ? 0 : 0x01);
+																}
+																setInsnInfo(2, 2, 15);
+															}
+															break;
+														case 3: // LD (nn), dd / LD dd, (nn)
+															{
+																const addrLower = fetchInst(2);
+																const addrUpper = fetchInst(3);
+																const addr = addrLower | (addrUpper << 8);
+																const target = secondInsnMiddle & 6;
+																if (secondInsnMiddle & 1) { // LD dd, (nn)
+																	const valueLower = this.#readMemory(addr);
+																	const valueUpper = this.#readMemory((addr + 1) & 0xffff);
+																	const value = valueLower | (valueUpper << 8);
+																	if (target === 6) {
+																		this.SP = value;
+																	} else {
+																		this.#regs8bitView.setUint16(target, value, false);
+																	}
+																} else { // LD (nn), dd
+																	const value = target === 6 ? this.SP : this.#regs8bitView.getUint16(target, false);
+																	this.#writeMemory(addr, value & 0xff);
+																	this.#writeMemory((addr + 1) & 0xffff, value >> 8);
+																}
+																setInsnInfo(4, 2, 20);
+															}
+															break;
+														case 4:
+															if (secondInsnMiddle === 0) { // NEG
+																const value = this.A;
+																const result = (-value) & 0xff;
+																const borrowCheck4 = (~value & 0xf) + 1;
+																this.A = result;
+																this.F = (this.F & 0x28) |
+																	(result & 0x80) |
+																	(result === 0 ? 0x40 : 0) |
+																	(borrowCheck4 & 0x10 ? 0 : 0x10) |
+																	(value === 0x80 ? 0x04 : 0) |
+																	0x02 |
+																	(value !== 0x00 ? 0x01 : 0);
+																setInsnInfo(2, 2, 8);
+															}
+															break;
+														case 5:
+															if (secondInsnMiddle === 0 || secondInsnMiddle === 1) { // RETN / RETI
+																const newPcLow = this.#readMemory(this.SP);
+																const newPcHigh = this.#readMemory((this.SP + 1) & 0xffff);
+																this.SP += 2;
+																if (secondInsnMiddle === 0) { // RETN
+																	this.IFF1 = this.IFF2;
+																}
+																setInsnInfo(2, 2, 14);
+																nextPC = newPcLow | (newPcHigh << 8);
+															}
+															break;
+														case 6: // IM 0 / IM 1 / IM 2
+															{
+																let newIMF = null;
+																switch (secondInsnMiddle) {
+																	case 0: newIMF = 0; break; // IM 0
+																	case 2: newIMF = 1; break; // IM 1
+																	case 3: newIMF = 2; break; // IM 2
+																}
+																if (newIMF !== null) {
+																	this.IMF = newIMF;
+																	setInsnInfo(2, 2, 8);
+																}
+															}
+															break;
+														case 7:
+															switch (secondInsnMiddle) {
+																case 0: // LD I, A
+																	this.I = this.A;
+																	setInsnInfo(2, 2, 9);
+																	break;
+																case 1: // LD R, A
+																	this.R = this.A;
+																	setInsnInfo(2, 0, 9);
+																	break;
+																case 2: // LD A, I
+																	{
+																		const value = this.I;
+																		this.A = value;
+																		this.F = (this.F & 0x29) |
+																			(value & 0x80) |
+																			(value === 0 ? 0x40 : 0) |
+																			(this.IFF2 ? 0x04 : 0);
+																		setInsnInfo(2, 2, 9);
+																	}
+																	break;
+																case 3: // LD A, R
+																	{
+																		const value = (this.R & 0x80) | ((this.R + 2) & 0x7f);
+																		this.A = value;
+																		this.F = (this.F & 0x29) |
+																			(value & 0x80) |
+																			(value === 0 ? 0x40 : 0) |
+																			(this.IFF2 ? 0x04 : 0);
+																		setInsnInfo(2, 2, 9);
+																	}
+																	break;
+																case 4: // RRD
+																	{
+																		const inA = this.A;
+																		const inM = this.#readMemory(this.HL);
+																		const outA = (inA & 0xf0) | (inM & 0x0f);
+																		const outM = ((inA << 4) | (inM >> 4)) & 0xff;
+																		this.A = outA;
+																		this.#writeMemory(this.HL, outM);
+																		this.F = (this.F & 0x29) |
+																			(outA & 0x80) |
+																			(outA === 0 ? 0x40 : 0) |
+																			(R80C26.#isEvenParity8bit(outA) ? 0x04 : 0);
+																		setInsnInfo(2, 2, 18);
+																	}
+																	break;
+																case 5: // RLD
+																	{
+																		const inA = this.A;
+																		const inM = this.#readMemory(this.HL);
+																		const outA = (inA & 0xf0) | (inM >> 4);
+																		const outM = ((inM << 4) | (inA & 0x0f)) & 0xff;
+																		this.A = outA;
+																		this.#writeMemory(this.HL, outM);
+																		this.F = (this.F & 0x29) |
+																			(outA & 0x80) |
+																			(outA === 0 ? 0x40 : 0) |
+																			(R80C26.#isEvenParity8bit(outA) ? 0x04 : 0);
+																		setInsnInfo(2, 2, 18);
+																	}
+																	break;
+															}
+															break;
+													}
+													break;
+												case 2:
+													break;
+											}
+										}
+										break;
 								}
 							}
 							break;
