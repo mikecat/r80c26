@@ -944,6 +944,58 @@ class R80C26 {
 													}
 													break;
 												case 2:
+													if ((secondInsnMiddle & 4) && !(secondInsnLower & 4)) {
+														const operation = secondInsnLower & 3;
+														const isIO = secondInsnLower & 2;
+														const isBackward = secondInsnMiddle & 1;
+														const isRepeat = secondInsnMiddle & 2;
+														let compareMatched = false;
+														switch (operation) {
+															case 0: // LDI/LDIR/LDD/LDDR
+																this.#writeMemory(this.DE, this.#readMemory(this.HL));
+																if (isBackward) this.DE--; else this.DE++;
+																this.F = (this.F & 0xe9) |
+																	(this.BC === 1 ? 0 : 0x04);
+																break;
+															case 1: // CPI/CPD/CPIR/CPDR
+																{
+																	const A = this.A;
+																	const value = this.#readMemory(this.HL);
+																	const valueInv = value ^ 0xff;
+																	const result = A + valueInv + 1;
+																	const resultHalf = (A & 0xf) + (valueInv & 0xf) + 1;
+																	compareMatched = A === value;
+																	this.F = (this.F & 0x29) |
+																		(result & 0x80) |
+																		(compareMatched ? 0x40 : 0) |
+																		(resultHalf & 0x10 ? 0 : 0x10) |
+																		(this.BC === 1 ? 0 : 0x04) |
+																		0x02;
+																}
+																break;
+															case 2: // INI/INIR/INIR/INDR
+																this.#writeMemory(this.HL, this.#readIO(this.BC));
+																this.F = (this.F & 0xbd) |
+																	(this.B === 1 ? 0x40 : 0) |
+																	0x02;
+																break;
+															case 3: // OUTI/OUTD/OTIR/OTDR
+																{
+																	const newB = (this.B - 1) & 0xff;
+																	this.#writeIO((newB << 8) | this.C, this.#readMemory(this.HL));
+																	this.F = (this.F & 0xbd) |
+																		(this.B === 1 ? 0x40 : 0) |
+																		0x02;
+																}
+																break;
+														}
+														if (isBackward) this.HL--; else this.HL++;
+														if ((isIO ? --this.B : --this.BC) !== 0 && isRepeat && !compareMatched) {
+															setInsnInfo(0, 2, 21);
+														} else {
+															setInsnInfo(2, 2, 16);
+														}
+													}
 													break;
 											}
 										}
