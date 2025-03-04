@@ -751,6 +751,162 @@ class R80C26 {
 											nextPC = destLow | (destHigh << 8);
 										}
 										break;
+									case 3: // 0xDD
+									case 7: // 0xFD
+										{
+											const secondInsn = fetchInst(1);
+											const secondInsnUpper = secondInsn >> 6;
+											const secondInsnMiddle = (secondInsn >> 3) & 7;
+											const secondInsnLower = secondInsn & 7;
+											let regValue = firstInsnMiddle === 7 ? this.IY : this.IX;
+											switch (secondInsnUpper) {
+												case 0:
+													if (secondInsnLower === 1 && (secondInsnMiddle & 1)) { // ADD IX, pp / ADD IY, rr
+														let value = 0;
+														switch (secondInsnMiddle) {
+															case 1: value = this.BC; break;
+															case 3: value = this.DE; break;
+															case 5: value = regValue; break;
+															case 7: value = this.SP; break;
+														}
+														const result = regValue + value;
+														const resultHalf = (regValue & 0xfff) + (value & 0xfff);
+														this.F = (this.F & 0xec) |
+															(resultHalf & 0x1000 ? 0x10 : 0) |
+															(result & 0x10000 ? 0x01 : 0);
+														regValue = result;
+														setInsnInfo(2, 2, 15);
+													} else {
+														switch (secondInsn) {
+															case 0x21: // LD IX/IY, nn
+															case 0x22: // LD (nn), IX/IY
+															case 0x2a: // LD IX/IY, (nn)
+																{
+																	const valueLower = fetchInst(2);
+																	const valueUpper = fetchInst(3);
+																	const value = valueLower | (valueUpper << 8);
+																	switch (secondInsn) {
+																		case 0x21:
+																			regValue = value;
+																			setInsnInfo(4, 2, 14);
+																			break;
+																		case 0x22:
+																			this.#writeMemory(value, regValue & 0xff);
+																			this.#writeMemory((value + 1) & 0xffff, regValue >> 8);
+																			setInsnInfo(4, 2, 20);
+																			break;
+																		case 0x2a:
+																			{
+																				const loadedLower = this.#readMemory(value);
+																				const loadedUpper = this.#readMemory((value + 1) & 0xffff);
+																				regValue = loadedLower | (loadedUpper << 8);
+																				setInsnInfo(4, 2, 20);
+																			}
+																			break;
+																	}
+																}
+																break;
+															case 0x23: // INC IX/IY
+																regValue = (regValue + 1) & 0xffff;
+																setInsnInfo(2, 2, 10);
+																break;
+															case 0x2b: // DEC IX/IY
+																regValue = (regValue - 1) & 0xffff;
+																setInsnInfo(2, 2, 10);
+																break;
+															case 0x34: // INC (IX/IY+d)
+															case 0x35: // DEC (IX/IY+d)
+															case 0x36: // LD (IX/IY+d), n
+																{
+																	const dRaw = fetchInst(2);
+																	const d = dRaw & 0x80 ? dRaw - 0x100 : dRaw;
+																	const addr = (regValue + d) & 0xffff;
+																	let calcValue = null;
+																	switch (secondInsn) {
+																		case 0x34: // INC
+																			{
+																				const srcValue = this.#readMemory(addr);
+																				calcValue = (srcValue + 1) & 0xff;
+																				const carryHalf = (srcValue & 0xf) + 1;
+																				this.F = (this.F & 0xd9) |
+																					(calcValue & 0x80) |
+																					(calcValue === 0 ? 0x40 : 0) |
+																					(carryHalf & 0x10) |
+																					(srcValue === 0x7f ? 0x04 : 0);
+																				setInsnInfo(3, 2, 23);
+																			}
+																			break;
+																		case 0x35: // DEC
+																			{
+																				const srcValue = this.#readMemory(addr);
+																				calcValue = (srcValue - 1) & 0xff;
+																				const carryHalf = (~srcValue & 0xf) + 1;
+																				this.F = (this.F & 0xd9) |
+																					(calcValue & 0x80) |
+																					(calcValue === 0 ? 0x40 : 0) |
+																					(carryHalf & 0x10 ? 0 : 0x10) |
+																					(srcValue === 0x80 ? 0x04 : 0) |
+																					0x02;
+																				setInsnInfo(3, 2, 23);
+																			}
+																			break;
+																		case 0x36: // LD
+																			calcValue = fetchInst(3);
+																			setInsnInfo(4, 2, 19);
+																			break;
+																	}
+																	if (calcValue !== null) {
+																		this.#writeMemory(addr, calcValue);
+																	}
+																}
+																break;
+														}
+													}
+													break;
+												case 1:
+													if (secondInsnLower === 6) { // LD r, (IX/IY+d)
+														if (secondInsnMiddle !== 6) {
+															const dRaw = fetchInst(2);
+															const d = dRaw & 0x80 ? dRaw - 0x100 : dRaw;
+															const addr = (regValue + d) & 0xffff;
+															this.#regs8bit[secondInsnMiddle] = this.#readMemory(addr);
+															setInsnInfo(3, 2, 19);
+														}
+													} else if (secondInsnMiddle === 6) { // LD (IX/IY+d), r
+														// 上の条件分岐より、secondInsnLower !== 6 を満たす
+														const dRaw = fetchInst(2);
+														const d = dRaw & 0x80 ? dRaw - 0x100 : dRaw;
+														const addr = (regValue + d) & 0xffff;
+														this.#writeMemory(addr, this.#regs8bit[secondInsnLower]);
+														setInsnInfo(3, 2, 19);
+													}
+													break;
+												case 2: // ADD/ADC/SUB/SBC/AND/OR/XOR/CP A, (IX/IY+d)
+													break;
+												case 3:
+													switch (secondInsn) {
+														case 0xcb: // RLC/RL/RRC/RR/SLA/SRA/SRL (IX/IY+d) / BIT/SET/RES b, (IX+d)
+															break;
+														case 0xe1: // POP IX/IY
+															break;
+														case 0xe3: // EX (SP), IX/IY
+															break;
+														case 0xe5: // PUSH IX/IY
+															break;
+														case 0xe9: // JP (IX/IY)
+															break;
+														case 0xf9: // LD SP, IX/IY
+															break;
+													}
+													break;
+											}
+											if (firstInsnMiddle === 7) {
+												this.IY = regValue;
+											} else {
+												this.IX = regValue;
+											}
+										}
+										break;
 									case 5: // 0xED
 										{
 											const secondInsn = fetchInst(1);
