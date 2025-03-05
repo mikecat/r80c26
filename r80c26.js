@@ -160,6 +160,48 @@ class R80C26 {
 		}
 	}
 
+	// シフト操作を行い、フラグを更新する。結果を返す
+	#shiftOperation(srcValue, kind) {
+		const carry = this.F & 1;
+		let value = 0, newCarry = 0;
+		switch (kind) {
+			case 0: // RLC
+				value = ((srcValue << 1) | (srcValue >> 7)) & 0xff;
+				newCarry = srcValue & 0x80;
+				break;
+			case 1: // RRC
+				value = ((srcValue >> 1) | (srcValue << 7)) & 0xff;
+				newCarry = srcValue & 1;
+				break;
+			case 2: // RL
+				value = ((srcValue << 1) | carry) & 0xff;
+				newCarry = srcValue & 0x80;
+				break;
+			case 3: // RR
+				value = ((srcValue >> 1) | (carry << 7)) & 0xff;
+				newCarry = srcValue & 1;
+				break;
+			case 4: // SLA
+				value = (srcValue << 1) & 0xff;
+				newCarry = srcValue & 0x80;
+				break;
+			case 5: // SRA
+				value = (srcValue & 0x80) | (srcValue >> 1);
+				newCarry = srcValue & 1;
+				break;
+			case 7: // SRL
+				value = srcValue >> 1;
+				newCarry = srcValue & 1;
+				break;
+		}
+		this.F = (this.F & 0x28) |
+			(value & 0x80) |
+			(value === 0 ? 0x40 : 0) |
+			(R80C26.#isEvenParity8bit(value) ? 0x04 : 0) |
+			(newCarry ? 0x01 : 0);
+		return value;
+	}
+
 	#checkCondition(cc) {
 		let mask = 0;
 		switch (cc & 6) {
@@ -600,43 +642,7 @@ class R80C26 {
 											if (kind !== 6) { // RLC/RL/RRC/RR/SLA/SRA/SRL r/(HL)
 												const target = secondInsn & 7;
 												const srcValue = target === 6 ? this.#readMemory(this.HL) : this.#regs8bit[target];
-												const carry = this.F & 1;
-												let value = 0, newCarry = 0;
-												switch (kind) {
-													case 0: // RLC
-														value = ((srcValue << 1) | (srcValue >> 7)) & 0xff;
-														newCarry = srcValue & 0x80;
-														break;
-													case 1: // RRC
-														value = ((srcValue >> 1) | (srcValue << 7)) & 0xff;
-														newCarry = srcValue & 1;
-														break;
-													case 2: // RL
-														value = ((srcValue << 1) | carry) & 0xff;
-														newCarry = srcValue & 0x80;
-														break;
-													case 3: // RR
-														value = ((srcValue >> 1) | (carry << 7)) & 0xff;
-														newCarry = srcValue & 1;
-														break;
-													case 4: // SLA
-														value = (srcValue << 1) & 0xff;
-														newCarry = srcValue & 0x80;
-														break;
-													case 5: // SRA
-														value = (srcValue & 0x80) | (srcValue >> 1);
-														newCarry = srcValue & 1;
-														break;
-													case 7: // SRL
-														value = srcValue >> 1;
-														newCarry = srcValue & 1;
-														break;
-												}
-												this.F = (this.F & 0x28) |
-													(value & 0x80) |
-													(value === 0 ? 0x40 : 0) |
-													(R80C26.#isEvenParity8bit(value) ? 0x04 : 0) |
-													(newCarry ? 0x01 : 0);
+												const value = this.#shiftOperation(srcValue, kind);
 												if (target === 6) {
 													this.#writeMemory(this.HL, value);
 													setInsnInfo(2, 2, 15);
@@ -882,20 +888,94 @@ class R80C26 {
 													}
 													break;
 												case 2: // ADD/ADC/SUB/SBC/AND/OR/XOR/CP A, (IX/IY+d)
+													{
+														const dRaw = fetchInst(2);
+														const d = dRaw & 0x80 ? dRaw - 0x100 : dRaw;
+														const addr = (regValue + d) & 0xffff;
+														this.#arith8bit(this.#readMemory(addr), secondInsnMiddle);
+														setInsnInfo(3, 2, 19);
+													}
 													break;
 												case 3:
 													switch (secondInsn) {
-														case 0xcb: // RLC/RL/RRC/RR/SLA/SRA/SRL (IX/IY+d) / BIT/SET/RES b, (IX+d)
+														case 0xcb: // RLC/RL/RRC/RR/SLA/SRA/SRL (IX/IY+d) / BIT/SET/RES b, (IX/IY+d)
+															{
+																const dRaw = fetchInst(2);
+																const d = dRaw & 0x80 ? dRaw - 0x100 : dRaw;
+																const addr = (regValue + d) & 0xffff;
+																const forthInsn = fetchInst(3);
+																const forthInsnUpper = forthInsn >> 6;
+																const forthInsnMiddle = (forthInsn >> 3) & 7;
+																const forthInsnLower = forthInsn & 7;
+																if (forthInsnLower === 6) {
+																	switch (forthInsnUpper) {
+																		case 0: // RLC/RL/RRC/RR/SLA/SRA/SRL (IX/IY+d)
+																			if (forthInsnMiddle !== 6) {
+																				const srcValue = this.#readMemory(addr);
+																				const result = this.#shiftOperation(srcValue, forthInsnMiddle);
+																				this.#writeMemory(addr, result);
+																				setInsnInfo(4, 2, 23);
+																			}
+																			break;
+																		case 1: // BIT b, (IX/IY+d)
+																			{
+																				const value = this.#readMemory(addr);
+																				this.F = (this.F & 0xad) |
+																					((value >> forthInsnMiddle) & 1 ? 0 : 0x40) |
+																					0x10;
+																				setInsnInfo(4, 2, 20);
+																			}
+																			break;
+																		case 2: // RES b, (IX/IY+d)
+																			{
+																				const value = this.#readMemory(addr);
+																				this.#writeMemory(addr, value & ~(1 << forthInsnMiddle));
+																				setInsnInfo(4, 2, 23);
+																			}
+																			break;
+																		case 3: // SET b, (IX/IY+d)
+																			{
+																				const value = this.#readMemory(addr);
+																				this.#writeMemory(addr, value | (1 << forthInsnMiddle));
+																				setInsnInfo(4, 2, 23);
+																			}
+																			break;
+																	}
+																}
+															}
 															break;
 														case 0xe1: // POP IX/IY
+															{
+																const valueLower = this.#readMemory(this.SP);
+																const valueUpper = this.#readMemory((this.SP + 1) & 0xffff);
+																this.SP += 2;
+																regValue = valueLower | (valueUpper << 8);
+																setInsnInfo(2, 2, 14);
+															}
 															break;
 														case 0xe3: // EX (SP), IX/IY
+															{
+																const stackLower = this.#readMemory(this.SP);
+																const stackUpper = this.#readMemory((this.SP + 1) & 0xffff);
+																this.#writeMemory((this.SP + 1) & 0xffff, regValue >> 8);
+																this.#writeMemory(this.SP, regValue & 0xffff);
+																regValue = stackLower | (stackUpper << 8);
+																setInsnInfo(2, 2, 23);
+															}
 															break;
 														case 0xe5: // PUSH IX/IY
+															this.SP -= 2;
+															this.#writeMemory((this.SP + 1) & 0xffff, regValue >> 8);
+															this.#writeMemory(this.SP, regValue & 0xff);
+															setInsnInfo(2, 2, 15);
 															break;
 														case 0xe9: // JP (IX/IY)
+															setInsnInfo(0, 2, 8);
+															nextPC = regValue;
 															break;
 														case 0xf9: // LD SP, IX/IY
+															this.SP = regValue;
+															setInsnInfo(2, 2, 10);
 															break;
 													}
 													break;
